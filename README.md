@@ -6,7 +6,7 @@ A zero-boilerplate Spring Boot Auto-Configuration library that captures the **fu
 api.request.logging.enabled=true
 ```
 
-Compatible with **Spring Boot 2.5+** and **Java 8+**.
+Compatible with **Spring Boot 2.0.x +** and **Java 8+**. <br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_This project has been tested using Spring Boot version `2.0.1.RELEASE` as the minimum supported version._
 
 ---
 
@@ -39,7 +39,7 @@ Compatible with **Spring Boot 2.5+** and **Java 8+**.
 | **Configurable exclusions** | Skip paths (`/actuator`, `/swagger-ui`) and extensions (`.js`, `.css`, …) via properties |
 | **Body truncation** | `max-body-length` guards against heap pressure on large payloads |
 | **ThreadLocal request ID** | `RequestLogCollector.currentRequestId()` — zero-injection access from anywhere on the request thread; integrates with SLF4J MDC |
-| **Spring Boot 2.5+ & 3.x** | Both `spring.factories` and `AutoConfiguration.imports` are included |
+| **Spring Boot 2.x & 3.x** | Both `spring.factories` and `AutoConfiguration.imports` are included |
 | **Java 8 compatible** | No `var`, no `String.formatted()`, no `strip()` calls |
 
 ---
@@ -248,7 +248,7 @@ Both filters are registered via `FilterRegistrationBean` (not `@Order`) to preve
 |-------------|-----------------|-----------------|
 | 2.0.x       | 5.0.x           | `getTotalTimeMillis()` ✅ |
 | 2.3.x       | 5.2.x           | `getTotalTimeNanos()` ✅ (added in 5.2) |
-| 2.5.x – 3.x | 5.3.x / 6.x   | Both ✅ |
+| 2.5.x – 3.x | 5.3.x / 6.x     | Both ✅ |
 
 This starter uses `getTotalTimeMillis()` for broadest compatibility. If you are on Spring Boot 2.3+ and want nanosecond precision, you can fork `ApiLoggingFilter` and replace:
 
@@ -333,8 +333,6 @@ curl http://localhost:8080/actuator/health
 
 ════════════════════════════════════════════════════════
 
-[2m2026-03-26 11:47:28.834[0;39m [32m INFO[0;39m [35m3192[0;39m [2m---[0;39m [2m[nio-8080-exec-5][0;39m [36mo.springdoc.api.AbstractOpenApiResource [0;39m [2m:[0;39m Init duration for springdoc-openapi is: 360 ms
-
 =========== Request Logs [req-id: my-trace-002] ===========
 ── INCOMING
    requestId: my-trace-002
@@ -352,7 +350,6 @@ curl http://localhost:8080/actuator/health
    rowsFound: 1
 
 ════════════════════════════════════════════════════════
-
 
 =========== Request Logs [req-id: my-trace-003] ===========
 ── INCOMING
@@ -373,7 +370,6 @@ curl http://localhost:8080/actuator/health
 
 ════════════════════════════════════════════════════════
 
-
 =========== Request Logs [req-id: my-trace-004] ===========
 ── INCOMING
    requestId: my-trace-004
@@ -391,7 +387,6 @@ curl http://localhost:8080/actuator/health
    response: {"txnId":"TXN-ABCD1234","status":"CAPTURED","orderId":"ORD-UNKNOWN","amount":0.0}
 
 ════════════════════════════════════════════════════════
-
 
 =========== Request Logs [req-id: fallback-header-test] ===========
 ── INCOMING
