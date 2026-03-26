@@ -1,0 +1,16 @@
+# ════════════════════════════════════════════════════════════════════════════
+#  Spring Boot 2.x Auto-Configuration Registration
+#
+#  This file is the SPI mechanism for Spring Boot 2.x auto-configuration.
+#  Spring Boot scans all JARs on the classpath for this file and registers
+#  the listed classes as auto-configuration candidates.
+#
+#  Spring Boot 3.x uses:
+#    META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+#  (see that file in the same directory for Boot 3.x support)
+#
+#  Both files are present so this starter supports Spring Boot 2.5+ AND 3.x.
+# ════════════════════════════════════════════════════════════════════════════
+
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.github.yash777.apirequestlogging.autoconfigure.ApiRequestLoggingAutoConfiguration

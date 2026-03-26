@@ -1,0 +1,4 @@
+# Spring Boot 3.x Auto-Configuration Registration
+# This file is scanned by Spring Boot 3.x to register auto-configurations.
+# Spring Boot 2.x uses META-INF/spring.factories (also present in this JAR).
+com.github.yash777.apirequestlogging.autoconfigure.ApiRequestLoggingAutoConfiguration
