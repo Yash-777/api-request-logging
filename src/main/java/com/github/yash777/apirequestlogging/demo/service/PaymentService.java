@@ -52,22 +52,6 @@ import java.util.UUID;
  * @see RequestLogCollector#addLog(String, String, Object)
  */
 @Service
-//@ConditionalOnProperty(
-//    prefix      = "api.request.logging",
-//    name        = "enabled",
-//    havingValue = "true"
-//)
-////Guard 1 — class must be present (always true inside this project itself)
-//@ConditionalOnClass(name = "com.github.yash777.apirequestlogging.demo.DemoApplication")
-////Guard 2 — property only set by pom.xml jvmArguments, never by a consumer
-//@ConditionalOnProperty(
-//	prefix      = "api.request.logging",
-//	name        = "live-demo",
-//	havingValue = "true",
-//	matchIfMissing = false
-//)
-
-@AutoConfigureAfter(com.github.yash777.apirequestlogging.demo.DemoApplication.class) // Crucial: Wait for Main class beans
 @ConditionalOnDemoEnvironment             // Apply your combined 3 conditions here
 public class PaymentService {
 
@@ -113,13 +97,13 @@ public class PaymentService {
         String key = collector.buildRetryKey("PaymentGateway/charge");
 
         // ── Log the outgoing request BEFORE the call ──────────────────────
-        collector.addLog(key, "request", request);
+        collector.addLog(key, RequestLogCollector.LOG_REQUEST, request);
 
         // ── Simulate payment gateway call (replace with real HTTP call) ───
         PaymentResponse response = simulateGatewayCall(request);
 
         // ── Log the response AFTER the call ──────────────────────────────
-        collector.addLog(key, "response", response);
+        collector.addLog(key, RequestLogCollector.LOG_RESPONSE, response);
 
         return response;
     }
@@ -145,7 +129,7 @@ public class PaymentService {
         PaymentResponse response = new PaymentResponse(
                 txnId, "CAPTURED", "ORD-UNKNOWN", 0.0);
 
-        collector.addLog(key, "response", response);
+        collector.addLog(key, RequestLogCollector.LOG_RESPONSE, response);
 
         return response;
     }

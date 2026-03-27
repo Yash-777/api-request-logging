@@ -8,6 +8,9 @@ import org.springframework.core.type.AnnotatedTypeMetadata;
  * Custom condition to manually verify the existence of 'dummyBean'.
  * This is more reliable for class-level filtering when beans are 
  * defined in the Main class.
+ *
+ * @author Yash
+ * @since 1.0.0
  */
 public class DummyBeanCondition implements Condition {
 

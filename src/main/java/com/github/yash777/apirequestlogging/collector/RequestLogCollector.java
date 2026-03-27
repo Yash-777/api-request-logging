@@ -12,6 +12,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -73,23 +75,57 @@ import java.util.UUID;
  * {@link #cleanup()} ({@code @PreDestroy}).  Tomcat reuses threads; without
  * explicit removal, request B would see request A's ID.</p>
  *
- * <h3>Using from your services</h3>
+ * <h3>Using from your services — recommended pattern with try/catch/finally</h3>
+ * <p>Always log inside a {@code try/catch/finally} block so that the response
+ * (or {@code null} on failure) is always recorded even when the gateway throws:</p>
  * <pre>{@code
  * @Service
  * public class PaymentService {
  *
  *     @Autowired
- *     private RequestLogCollector collector;   // proxy — safe in singleton
+ *     private RequestLogCollector collector;   // CGLIB proxy — safe in singleton
  *
- *     public PaymentResponse charge(PaymentRequest req) {
+ *     public PaymentResponse charge(PaymentRequest request) {
+ *         // buildRetryKey stamps the current time → each retry gets its own entry
  *         String key = collector.buildRetryKey("PaymentGateway/charge");
- *         collector.addLog(key, "request", req);
- *         PaymentResponse res = gateway.post(req);
- *         collector.addLog(key, "response", res);
+ *
+ *         collector.addLog(key, RequestLogCollector.LOG_REQUEST,  request);  // before call
+ *
+ *         PaymentResponse res = null;
+ *         try {
+ *             res = gateway.post(request);                                    // actual HTTP call
+ *         } catch (Exception e) {
+ *             // Pass the Throwable directly — addLog() automatically truncates
+ *             // the stack trace to the first 5 lines so logs stay readable.
+ *             collector.addLog(key, RequestLogCollector.LOG_EXCEPTION, e);
+ *         } finally {
+ *             collector.addLog(key, RequestLogCollector.LOG_RESPONSE, res);  // null-safe
+ *         }
  *         return res;
  *     }
  * }
  * }</pre>
+ *
+ * <h4>Sample console output for the pattern above (success path)</h4>
+ * <pre>
+ * ── PaymentGateway/charge [14:32:05.001]
+ *    request:   {"orderId":"ORD-1","amount":500.0,"currency":"INR"}
+ *    response:  {"txnId":"TXN-99","status":"SUCCESS","orderId":"ORD-1","amount":500.0}
+ * </pre>
+ *
+ * <h4>Sample console output (failure path)</h4>
+ * <pre>
+ * ── PaymentGateway/charge [14:32:05.001]
+ *    request:    {"orderId":"ORD-1","amount":500.0,"currency":"INR"}
+ *    exception:  java.net.ConnectException: Connection refused
+ *                  at sun.nio.ch.SocketChannelImpl.checkConnect(SocketChannelImpl.java:...)
+ *                  at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:...)
+ *                  at org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor...
+ *                  at org.apache.http.impl.nio.reactor.AbstractIOReactor.execute(...)
+ *                  at org.apache.http.impl.nio.reactor.BaseIOReactor.execute(...)
+ *                  ... (truncated to 5 lines)
+ *    response:   null
+ * </pre>
  *
  * @author Yash
  * @since 1.0.0
@@ -120,6 +156,21 @@ public class RequestLogCollector {
     private static final ObjectMapper      MAPPER = new ObjectMapper();
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
+    /**
+     * Maximum number of stack-trace lines captured when an {@link Exception} is
+     * passed to {@link #addLog} with the inner-key {@link #LOG_EXCEPTION}.
+     *
+     * <p>Full stack traces from frameworks like Spring, Hibernate, or Apache HttpClient
+     * can easily exceed 60–100 lines, flooding the log with noise.  Keeping the first
+     * {@value} lines is enough to identify the root-cause exception class, message,
+     * and the first few frames of the call stack — the frames most relevant to
+     * application code.</p>
+     *
+     * <p>Set to a smaller value (e.g. {@code 3}) for very compact logs, or increase
+     * it if your application has deep call chains that need more context.</p>
+     */
+    private static final int EXCEPTION_MAX_LINES = 5;
+
     // ── ThreadLocal — ambient request-ID without any injection ────────────
     //
     // Lifecycle: set in addRequestMeta() → read via currentRequestId()
@@ -146,6 +197,85 @@ public class RequestLogCollector {
         return CURRENT_REQUEST_ID.get();
     }
 
+    // ═════════════════════════════════════════════════════════════════════
+    //  INNER-KEY CONSTANTS
+    //  Use these constants as the innerKey argument to addLog() for the three
+    //  standard fields in every third-party call entry.  Using constants
+    //  prevents typos and makes grepping logs reliable.
+    // ═════════════════════════════════════════════════════════════════════
+
+    /**
+     * Standard inner-key for the outgoing request payload of a third-party call.
+     *
+     * <p>Use this constant as the {@code innerKey} in
+     * {@link #addLog(String, String, Object)} to record what was sent:</p>
+     * <pre>{@code
+     * collector.addLog(key, RequestLogCollector.LOG_REQUEST, paymentRequest);
+     * }</pre>
+     * <p>Produces the log line:</p>
+     * <pre>
+     *    request:  {"orderId":"ORD-1","amount":500.0}
+     * </pre>
+     */
+    public static final String LOG_REQUEST = "request";
+
+    /**
+     * Standard inner-key for the incoming response payload of a third-party call.
+     *
+     * <p>Use this constant as the {@code innerKey} in
+     * {@link #addLog(String, String, Object)} to record what was received.
+     * Pass {@code null} if the call threw before a response was received —
+     * {@link #addLog} stores {@code null} values and {@link #printLogs()}
+     * prints {@code "null"} so the absence of a response is explicit:</p>
+     * <pre>{@code
+     * PaymentResponse res = null;
+     * try {
+     *     res = gateway.post(request);
+     * } finally {
+     *     collector.addLog(key, RequestLogCollector.LOG_RESPONSE, res); // null-safe
+     * }
+     * }</pre>
+     * <p>Produces the log line:</p>
+     * <pre>
+     *    response:  {"txnId":"TXN-99","status":"SUCCESS"}
+     *    // or on failure:
+     *    response:  null
+     * </pre>
+     */
+    public static final String LOG_RESPONSE = "response";
+
+    /**
+     * Standard inner-key for an exception thrown during a third-party call.
+     *
+     * <p>When this key is used, {@link #addLog(String, String, Object)} detects
+     * that the value is a {@link Throwable} and automatically formats the stack
+     * trace — keeping only the first {@value #EXCEPTION_MAX_LINES} lines to
+     * avoid flooding the log.  Always use inside a {@code catch} block:</p>
+     * <pre>{@code
+     * try {
+     *     res = gateway.post(request);
+     * } catch (Exception e) {
+     *     collector.addLog(key, RequestLogCollector.LOG_EXCEPTION, e);
+     * }
+     * }</pre>
+     * <p>Produces the log line (truncated to {@value #EXCEPTION_MAX_LINES} lines):</p>
+     * <pre>
+     *    exception:  java.net.ConnectException: Connection refused
+     *                  at sun.nio.ch.SocketChannelImpl.checkConnect(...)
+     *                  at sun.nio.ch.SocketChannelImpl.finishConnect(...)
+     *                  at org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor...
+     *                  at org.apache.http.impl.nio.reactor.AbstractIOReactor.execute(...)
+     *                  at org.apache.http.impl.nio.reactor.BaseIOReactor.execute(...)
+     *                  ... (truncated to 5 lines)
+     * </pre>
+     *
+     * <p><strong>Note:</strong> the truncation is applied regardless of which
+     * outer {@code key} is used — the trigger is solely the {@code LOG_EXCEPTION}
+     * inner-key value.  You may also pass any other {@link Throwable} subclass
+     * ({@code RuntimeException}, {@code Error}, etc.).</p>
+     */
+    public static final String LOG_EXCEPTION = "exception";
+
     // ── Constants ─────────────────────────────────────────────────────────
 
     /**
@@ -160,7 +290,7 @@ public class RequestLogCollector {
     //
     // mapLog  — NOT static. Each @RequestScope instance has its own map.
     //           Outer key: INCOMING_KEY or "ServiceName [HH:mm:ss.SSS]"
-    //           Inner key: field name   ("request", "response", "error", …)
+    //           Inner key: field name   ("request", "response", "exception", …)
     //           LinkedHashMap preserves insertion order → chronological output.
     //
     private final Map<String, Map<String, String>> mapLog = new LinkedHashMap<>();
@@ -295,23 +425,87 @@ public class RequestLogCollector {
      * is created automatically ({@code computeIfAbsent}).  If it already exists
      * the new field is appended to the same inner map, preserving insertion order.</p>
      *
-     * <pre>{@code
-     * // Typical 3rd-party call pattern:
-     * String key = collector.buildRetryKey("PaymentService/charge");
+     * <h4>Exception handling — automatic stack-trace truncation</h4>
+     * <p>When {@code innerKey} equals {@link #LOG_EXCEPTION} <strong>and</strong>
+     * {@code value} is a {@link Throwable}, the full stack trace is captured via
+     * {@link PrintWriter}/{@link StringWriter} and then truncated to the first
+     * {@value #EXCEPTION_MAX_LINES} lines before storage.  A
+     * {@code "... (truncated to N lines)"} suffix is appended so the log clearly
+     * indicates that more frames were omitted.</p>
      *
-     * collector.addLog(key, "request",  chargeRequestPayload);   // before HTTP call
-     * ChargeResponse res = restTemplate.postForObject(...);
-     * collector.addLog(key, "response", res);                    // after HTTP call
+     * <p>This prevents framework stack traces (Spring, Hibernate, Apache HttpClient)
+     * from producing 60–100 line log entries for a single failed call.</p>
+     *
+     * <h4>Recommended usage pattern (try/catch/finally)</h4>
+     * <pre>{@code
+     * String key = collector.buildRetryKey("PaymentGateway/charge");
+     *
+     * collector.addLog(key, RequestLogCollector.LOG_REQUEST, request);   // before call
+     *
+     * PaymentResponse res = null;
+     * try {
+     *     res = gateway.post(request);
+     * } catch (Exception e) {
+     *     collector.addLog(key, RequestLogCollector.LOG_EXCEPTION, e);   // truncated trace
+     * } finally {
+     *     collector.addLog(key, RequestLogCollector.LOG_RESPONSE, res);  // null if threw
+     * }
      * }</pre>
      *
-     * @param key      outer map key — typically a service name or endpoint URL
-     * @param innerKey field name inside the entry; must not be {@code null}
-     * @param value    the value — {@code null}, {@link String}, or any
-     *                 Jackson-serialisable object
+     * <h4>Inner-key constants</h4>
+     * <p>Prefer the typed constants over raw string literals to avoid typos:</p>
+     * <table border="1" cellpadding="4">
+     *   <tr><th>Constant</th><th>Value</th><th>When to use</th></tr>
+     *   <tr>
+     *     <td>{@link #LOG_REQUEST}</td><td>{@code "request"}</td>
+     *     <td>Outgoing request payload — log before the HTTP call</td>
+     *   </tr>
+     *   <tr>
+     *     <td>{@link #LOG_RESPONSE}</td><td>{@code "response"}</td>
+     *     <td>Incoming response payload — log in {@code finally} block</td>
+     *   </tr>
+     *   <tr>
+     *     <td>{@link #LOG_EXCEPTION}</td><td>{@code "exception"}</td>
+     *     <td>Caught {@link Throwable} — log in {@code catch} block;
+     *         stack trace auto-truncated to {@value #EXCEPTION_MAX_LINES} lines</td>
+     *   </tr>
+     * </table>
+     *
+     * @param key      outer map key — typically a service name or endpoint URL;
+     *                 use {@link #buildRetryKey(String)} to get a timestamped key
+     * @param innerKey field name inside the entry; use {@link #LOG_REQUEST},
+     *                 {@link #LOG_RESPONSE}, or {@link #LOG_EXCEPTION} for standard
+     *                 fields; must not be {@code null}
+     * @param value    the value to log — accepts {@code null} (stored as {@code null}
+     *                 and printed explicitly), {@link String} (stored as-is),
+     *                 {@link Throwable} with {@link #LOG_EXCEPTION} key (stack trace
+     *                 truncated to {@value #EXCEPTION_MAX_LINES} lines), or any
+     *                 Jackson-serialisable object (converted to compact JSON)
      */
     public void addLog(String key, String innerKey, Object value) {
         if (key == null || innerKey == null) return;
         try {
+            // ── Exception handling — truncate stack trace ─────────────────
+            // When the caller uses the LOG_EXCEPTION inner-key and passes a
+            // Throwable, capture the full stack trace as a string and keep
+            // only the first EXCEPTION_MAX_LINES lines.
+            //
+            // Why not store the full trace?
+            //   A typical Spring + HttpClient stack trace can be 80–120 lines.
+            //   Multiplied by concurrent requests this floods System.out and
+            //   makes the structured log block unreadable.
+            //   The first 5 lines always contain: exception class + message +
+            //   the application frames closest to the throw site — exactly
+            //   what is needed to diagnose the failure.
+            //
+            // Why read by innerKey and not instanceof Throwable?
+            //   The caller may intentionally pass a Throwable as a "response"
+            //   field for diagnostic purposes.  Checking the key makes the
+            //   truncation opt-in and explicit.
+            if (LOG_EXCEPTION.equals(innerKey) && value instanceof Throwable) {
+                value = truncateStackTrace((Throwable) value, EXCEPTION_MAX_LINES);
+            }
+
             mapLog.computeIfAbsent(key, k -> new LinkedHashMap<>())
                   .put(innerKey, toJson(value));
         } catch (Exception e) {
@@ -337,8 +531,8 @@ public class RequestLogCollector {
      */
     public void addRequestResponseLog(String key, Object request, Object response) {
         if (key == null) return;
-        addLog(key, "request",  request);
-        addLog(key, "response", response);
+        addLog(key, LOG_REQUEST,  request);
+        addLog(key, LOG_RESPONSE, response);
     }
 
     /**
@@ -351,12 +545,15 @@ public class RequestLogCollector {
      *
      * <pre>
      * ── PaymentGateway/charge [14:32:05.001]   ← attempt 1
-     *    request:   {"amount":500}
-     *    error:     Connection timed out
+     *    request:    {"amount":500}
+     *    exception:  java.net.ConnectException: Connection refused
+     *                  at sun.nio.ch.SocketChannelImpl.checkConnect(...)
+     *                  ... (truncated to 5 lines)
+     *    response:   null
      *
      * ── PaymentGateway/charge [14:32:07.244]   ← attempt 2  (2 s backoff)
-     *    request:   {"amount":500}
-     *    response:  {"status":"SUCCESS","txnId":"TXN-99"}
+     *    request:    {"amount":500}
+     *    response:   {"status":"SUCCESS","txnId":"TXN-99"}
      * </pre>
      *
      * @param label human-readable service / endpoint label
@@ -400,8 +597,8 @@ public class RequestLogCollector {
      *    requestProcessedTime: 0h 0m 0s 312ms
      *
      * ── PaymentGateway/charge [14:32:05.001]
-     *    request:   {"amount":500,"orderId":"ORD-1"}
-     *    response:  {"status":"SUCCESS","txnId":"TXN-99"}
+     *    request:    {"amount":500,"orderId":"ORD-1"}
+     *    response:   {"status":"SUCCESS","txnId":"TXN-99"}
      *
      * ════════════════════════════════════════════════════════════
      * </pre>
@@ -446,6 +643,62 @@ public class RequestLogCollector {
     // ═════════════════════════════════════════════════════════════════════
     //  PRIVATE HELPERS
     // ═════════════════════════════════════════════════════════════════════
+
+    /**
+     * Captures the full stack trace of {@code throwable} and returns only
+     * the first {@code maxLines} lines, with a truncation notice appended.
+     *
+     * <h4>Why PrintWriter + StringWriter?</h4>
+     * <p>{@link Throwable#printStackTrace(PrintWriter)} is the standard JDK API
+     * for writing a full stack trace to a {@link java.io.Writer}.
+     * {@link StringWriter} captures those bytes in-memory without any I/O.
+     * This is Java 8 compatible — no {@code Stream} or {@code String.lines()}
+     * (Java 11+) are needed.</p>
+     *
+     * <h4>Output format</h4>
+     * <pre>
+     *   java.net.ConnectException: Connection refused
+     *     at sun.nio.ch.SocketChannelImpl.checkConnect(SocketChannelImpl.java:...)
+     *     at sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:...)
+     *     at org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor...
+     *     at org.apache.http.impl.nio.reactor.AbstractIOReactor.execute(...)
+     *     at org.apache.http.impl.nio.reactor.BaseIOReactor.execute(...)
+     *     ... (truncated to 5 lines)
+     * </pre>
+     *
+     * @param throwable the exception whose stack trace should be captured;
+     *                  must not be {@code null}
+     * @param maxLines  maximum number of lines to keep from the full stack trace
+     * @return a {@link String} containing at most {@code maxLines} lines of the
+     *         stack trace followed by a {@code "... (truncated to N lines)"} suffix
+     *         when the trace was cut; the full trace if it fits within the limit
+     */
+    private static String truncateStackTrace(Throwable throwable, int maxLines) {
+        // Capture the full stack trace into a String using PrintWriter/StringWriter.
+        // This is Java 8 compatible — Throwable.printStackTrace(PrintWriter) exists
+        // since Java 1.1.  We do NOT use String.lines() (Java 11+) or streams.
+        StringWriter sw = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(sw));
+        String fullTrace = sw.toString();
+
+        // Split on newlines.  Stack trace lines use "\r\n" on Windows and "\n"
+        // on Linux/macOS.  The regex handles both.
+        String[] lines = fullTrace.split("\\r?\\n");
+
+        if (lines.length <= maxLines) {
+            // Trace fits within the limit — return as-is (no truncation notice needed)
+            return fullTrace.trim();
+        }
+
+        // Keep the first maxLines lines and append a truncation notice so the
+        // log reader knows the trace was intentionally cut.
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < maxLines; i++) {
+            sb.append(lines[i]).append("\n");
+        }
+        sb.append("  ... (truncated to ").append(maxLines).append(" lines)");
+        return sb.toString();
+    }
 
     /**
      * Null-safe blank check.

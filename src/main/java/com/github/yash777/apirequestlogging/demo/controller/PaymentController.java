@@ -62,22 +62,6 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/payments")
-//@ConditionalOnProperty(
-//    prefix      = "api.request.logging",
-//    name        = "enabled",
-//    havingValue = "true"
-//)
-////Guard 1 — class must be present (always true inside this project itself)
-//@ConditionalOnClass(name = "com.github.yash777.apirequestlogging.demo.DemoApplication")
-////Guard 2 — property only set by pom.xml jvmArguments, never by a consumer
-//@ConditionalOnProperty(
-//	prefix      = "api.request.logging",
-//	name        = "live-demo",
-//	havingValue = "true",
-//	matchIfMissing = false
-//)
-
-@AutoConfigureAfter(com.github.yash777.apirequestlogging.demo.DemoApplication.class) // Crucial: Wait for Main class beans
 @ConditionalOnDemoEnvironment             // Apply your combined 3 conditions here
 public class PaymentController {
 
