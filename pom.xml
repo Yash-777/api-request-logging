@@ -2,334 +2,563 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║  api-request-logging-spring-boot-starter                                 ║
+  ║                                                                          ║
+  ║  A zero-boilerplate Spring Boot Auto-Configuration library that          ║
+  ║  captures the full HTTP request/response lifecycle — headers, body,      ║
+  ║  timing, correlation IDs, and third-party call logs — activated with     ║
+  ║  a single property:                                                      ║
+  ║                                                                          ║
+  ║    api.request.logging.enabled=true                                      ║
+  ║                                                                          ║
+  ║  Compatible with Spring Boot 2.0.x+ and Java 8+.                         ║
+  ║                                                                          ║
+  ║  Publishing target: Maven Central via Sonatype Central Portal            ║
+  ║  Modelled on: https://github.com/Yash-777/SeleniumWebDrivers/pom.xml     ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+  -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       GAV COORDINATES
+       groupId  : io.github.yash-777 — verified GitHub namespace on
+                  central.sonatype.com (see SETUP GUIDE below).
+                  NOTE: Previously com.github.yash777 was used in
+                  SeleniumWebDrivers; io.github.* is the current
+                  Sonatype Central Portal preferred convention for
+                  GitHub-hosted projects. Use whichever namespace you
+                  register / already have verified.
+       artifactId: matches the GitHub repository name for discoverability.
+       version  : SemVer, no -SNAPSHOT suffix allowed for Central releases.
+       ══════════════════════════════════════════════════════════════════════ -->
+  <groupId>io.github.yash-777</groupId>
+  <artifactId>api-request-logging-spring-boot-starter</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <!-- ── Human-readable identity ─────────────────────────────────────── -->
+  <!-- Using ${project.groupId}:${project.artifactId} as name is the
+       accepted Maven Central convention (same pattern as SeleniumWebDrivers). -->
+  <name>${project.groupId}:${project.artifactId}</name>
+
+  <description>
+    Spring Boot Auto-Configuration starter that captures the full HTTP
+    request/response lifecycle — headers, body, timing, correlation IDs,
+    and third-party call logs. Activated with a single property:
+    api.request.logging.enabled=true.
+    Compatible with Spring Boot 2.0.x+ and Java 8+.
+  </description>
+
+  <!-- Canonical project URL — used by Maven Central search UI and IDEs.
+       Must point to the actual GitHub repo (not the starter sub-name). -->
+  <url>https://github.com/Yash-777/api-request-logging</url>
+
+  <!-- Year the project was first created — informational metadata. -->
+  <inceptionYear>2025</inceptionYear>
+
+  <!-- ── Organization ────────────────────────────────────────────────── -->
+  <organization>
+    <name>GitHub OpenSource</name>
+    <url>https://github.com/Yash-777</url>
+  </organization>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       LICENSE
+       Apache 2.0 matches the LICENSE file already in your repository.
+       The <distribution>repo</distribution> tag tells Maven Central that
+       this artifact may be redistributed via a repository (required).
+       ══════════════════════════════════════════════════════════════════════ -->
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       DEVELOPERS
+       At least one <developer> entry with <email> is REQUIRED by Central.
+       Multiple developers can be listed; roles and timezone are optional
+       but recommended (carried over from your SeleniumWebDrivers pattern).
+       ══════════════════════════════════════════════════════════════════════ -->
+  <developers>
+    <developer>
+      <id>Yash-777</id>
+      <name>Yashwanth</name>
+      <email>yashwanth.merugu@gmail.com</email>
+      <url>https://github.com/Yash-777</url>
+      <organization>N/A</organization>
+      <organizationUrl>https://github.com/Yash-777</organizationUrl>
+      <roles>
+        <role>developer</role>
+      </roles>
+      <timezone>+5</timezone>
+    </developer>
+  </developers>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SCM — Source Control Management
+       Required by Maven Central. All three sub-elements must be present.
+
+       connection         : read-only URL (used by CI / consumers)
+       developerConnection: read-write URL (used during mvn release:prepare)
+       url                : human-readable web front-end URL
+       tag                : HEAD for development; release plugin will
+                            replace this automatically with the tag name
+                            (e.g. api-request-logging-spring-boot-starter/1.0.0)
+                            when running mvn release:prepare.
+
+       project.scm.id property below maps to the <server> id in settings.xml
+       so Maven can authenticate git push during release (same trick used in
+       your SeleniumWebDrivers pom via <project.scm.id>my-scm-server</project.scm.id>).
+       ══════════════════════════════════════════════════════════════════════ -->
+  <scm>
+    <url>https://github.com/Yash-777/api-request-logging</url>
+    <connection>scm:git:https://github.com/Yash-777/api-request-logging.git</connection>
+    <developerConnection>scm:git:https://github.com/Yash-777/api-request-logging.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
+  <!-- ── Issue tracker — informational, shown in Maven Central UI ───── -->
+  <issueManagement>
+    <system>GitHub Issues</system>
+    <url>https://github.com/Yash-777/api-request-logging/issues</url>
+  </issueManagement>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       DISTRIBUTION MANAGEMENT — Sonatype Central Portal (NEW)
+       ──────────────────────────────────────────────────────────────────────
+       IMPORTANT: This is the modern Central Portal endpoint, NOT the legacy
+       OSSRH (oss.sonatype.org) that was used in SeleniumWebDrivers 7 years
+       ago. OSSRH is being sunset (announced 2024). New projects MUST use
+       the Central Portal (central.sonatype.com).
+
+       The central-publishing-maven-plugin (added in the <profiles> section
+       below) overrides the actual upload URL at deploy-time, so this block
+       is primarily used by the maven-release-plugin for tag management and
+       by IDE tooling for metadata resolution.
+
+       serverId "central" must match:
+         (a) the <server><id>central</id>...</server> in ~/.m2/settings.xml
+         (b) the <publishingServerId>central</publishingServerId> in the plugin
+       ══════════════════════════════════════════════════════════════════════ -->
+  <distributionManagement>
+    <repository>
+      <id>central</id>
+      <name>Maven Central — Sonatype Central Portal</name>
+      <url>https://central.sonatype.com/api/v1/publisher/upload</url>
+    </repository>
+    <snapshotRepository>
+      <id>central</id>
+      <name>Maven Central Snapshots</name>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       PARENT — Spring Boot BOM
+       Provides managed versions for all Spring/Spring Boot dependencies so
+       individual <dependency> entries don't need explicit <version> tags.
+       Tested baseline: 2.0.1.RELEASE (minimum); also tested on 2.7.18 and 3.x.
+       ══════════════════════════════════════════════════════════════════════ -->
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <!-- Minimum supported baseline. Consumers on 2.3+, 2.5+, 2.7+, 3.x
+         will inherit a newer BOM from their own parent and override this. -->
+    <version>2.0.1.RELEASE</version>
+    <relativePath/>
+  </parent>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       PROPERTIES — centralised version management (SeleniumWebDrivers pattern)
+       ══════════════════════════════════════════════════════════════════════ -->
+  <properties>
+    <!-- Java target/source level — must be 8 for broadest compatibility -->
+    <java.version>8</java.version>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- ── Plugin versions — pinned for reproducible builds ── -->
+    <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+    <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
+    <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
+    <maven-release-plugin.version>3.0.1</maven-release-plugin.version>
+    <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
+    <central-publishing-plugin.version>0.9.0</central-publishing-plugin.version>
+
+    <!-- ── GPG signing ──────────────────────────────────────────────────
+         gpg.keyname         : last 16 hex chars of your GPG key fingerprint.
+                               Replace XXXXXXXXXXXXXXXX with your actual key ID.
+         gpg.passphraseServerId : maps to a <server> entry in ~/.m2/settings.xml
+                               whose <passphrase> holds your GPG passphrase
+                               (same pattern as SeleniumWebDrivers Yash@Sonatype).
+         ──────────────────────────────────────────────────────────────── -->
+    <gpg.keyname>XXXXXXXXXXXXXXXX</gpg.keyname>
+    <gpg.passphraseServerId>Yash@CentralPortal</gpg.passphraseServerId>
+
+    <!-- ── SCM authentication ───────────────────────────────────────────
+         project.scm.id maps to a <server> in settings.xml used by the
+         maven-release-plugin when it pushes the release tag to GitHub.
+         See: https://stackoverflow.com/a/28284333/5081877
+         ──────────────────────────────────────────────────────────────── -->
+    <project.scm.id>github-scm</project.scm.id>
+
+    <!-- Central Portal server id — must match distributionManagement + plugin -->
+    <sonatype.central.serverId>central</sonatype.central.serverId>
+
+    <!-- Demo context path — used ONLY by mvn spring-boot:run (not baked into JAR) -->
+    <demo.context.path>/api-request-logging-demo</demo.context.path>
+  </properties>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       DEPENDENCIES
+       ══════════════════════════════════════════════════════════════════════ -->
+  <dependencies>
+
+    <!-- ── Spring Boot Web (provided — consumer's classpath already has it) ──
+         "provided" scope: compiler and IDE can resolve Spring Web / Servlet /
+         StopWatch APIs, but the JAR is NOT bundled into the published artifact.
+         Avoids duplicate-class conflicts for consumers. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── Spring Boot AutoConfigure (provided) ──────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── Configuration-metadata processor (optional) ───────────────────
+         Generates META-INF/spring-configuration-metadata.json from
+         @ConfigurationProperties so IDEs show type-safe auto-complete hints
+         while the developer types api.request.logging.* property keys. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <optional>true</optional>
+    </dependency>
+
+    <!-- ── Jackson (provided) ────────────────────────────────────────────
+         ObjectMapper is used in RequestLogCollector to serialise
+         request/response objects to compact JSON strings for log storage.
+         Jackson is transitively pulled in by spring-boot-starter-web;
+         marking it "provided" avoids double-packaging. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- ── Test ──────────────────────────────────────────────────────── -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         DEMO-ONLY dependencies (scope=provided — never packaged into the
+         starter JAR that consumers download from Central).
+         These are only active when running: mvn spring-boot:run
+         ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- Swagger UI — demo interactive API docs
+         http://localhost:8080/api-request-logging-demo/swagger-ui/index.html
+         springdoc 1.7.0 supports Spring Boot 2.5–2.7.
+         For Spring Boot 3.x use springdoc-openapi-starter-webmvc-ui 2.x. -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-ui</artifactId>
+      <version>1.7.0</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Actuator — demo management endpoints
+         http://localhost:8080/api-request-logging-demo/actuator/health -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+  </dependencies>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       BUILD — plugins always active (compile, sources, javadoc, release)
+       GPG signing and Central publishing are in the <release> profile below
+       so that local development builds (mvn install / mvn verify) remain
+       fast and don't require a GPG key or network access to Central.
+       ══════════════════════════════════════════════════════════════════════ -->
+  <build>
+    <plugins>
+
+      <!-- ── Java compiler ──────────────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${maven-compiler-plugin.version}</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+        </configuration>
+      </plugin>
+
+      <!-- ── Surefire — test runner ─────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven-surefire-plugin.version}</version>
+      </plugin>
+
+      <!-- ── JAR manifest — Auto-Configuration SPI registration ────────────
+           Adds Spring-Boot-Auto-Configuration-Import to MANIFEST.MF so that
+           Spring Boot picks up ApiRequestLoggingAutoConfiguration via the SPI
+           mechanism alongside spring.factories (Boot 2.x) and
+           AutoConfiguration.imports (Boot 3.x). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <Spring-Boot-Auto-Configuration-Import>
+                com.github.yash777.apirequestlogging.autoconfigure.ApiRequestLoggingAutoConfiguration
+              </Spring-Boot-Auto-Configuration-Import>
+            </manifestEntries>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <!-- ── Sources JAR — REQUIRED by Maven Central ────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>${maven-source-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── Javadoc JAR — REQUIRED by Maven Central ────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${maven-javadoc-plugin.version}</version>
+        <configuration>
+          <source>${java.version}</source>
+          <!-- doclint=none suppresses HTML5 warnings on Java 8 javadoc -->
+          <doclint>none</doclint>
+        </configuration>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- ── Release plugin — automates tag, version bump, deploy ──────────
+           Usage:
+             mvn release:prepare -P release   (tags git, bumps pom version)
+             mvn release:perform -P release   (checks out tag, runs deploy)
+
+           tagNameFormat mirrors SeleniumWebDrivers:
+             api-request-logging-spring-boot-starter/1.0.0
+
+           checkModificationExcludes allows release:prepare to proceed even
+           when generated files (target/, README, .gitignore) are dirty —
+           same approach proven in SeleniumWebDrivers.
+           ──────────────────────────────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>${maven-release-plugin.version}</version>
+        <configuration>
+          <tagNameFormat>@{project.artifactId}/@{project.version}</tagNameFormat>
+          <autoVersionSubmodules>true</autoVersionSubmodules>
+          <!-- useReleaseProfile=false — we use our own explicit <release> profile -->
+          <useReleaseProfile>false</useReleaseProfile>
+          <!-- releaseProfiles activates our profile during release:perform -->
+          <releaseProfiles>release</releaseProfiles>
+          <goals>deploy</goals>
+          <checkModificationExcludes>
+            <checkModificationExclude>target/</checkModificationExclude>
+            <checkModificationExclude>docs/</checkModificationExclude>
+            <checkModificationExclude>.gitignore</checkModificationExclude>
+            <checkModificationExclude>README.md</checkModificationExclude>
+            <checkModificationExclude>LICENSE</checkModificationExclude>
+          </checkModificationExcludes>
+        </configuration>
+      </plugin>
+
+      <!-- ── Spring Boot Maven Plugin — demo runner ONLY ───────────────────
+           The repackage goal is deliberately NOT bound here so the published
+           artifact remains a plain library JAR, not an executable fat JAR.
+           JVM args inject demo-only config at run-time; they are NOT compiled
+           into any class file and have zero effect on the published JAR.
+
+           Run the demo: mvn spring-boot:run
+             Swagger UI → http://localhost:8080/api-request-logging-demo/swagger-ui/index.html
+             API docs   → http://localhost:8080/api-request-logging-demo/v3/api-docs
+             Actuator   → http://localhost:8080/api-request-logging-demo/actuator/health
+           ──────────────────────────────────────────────────────────────── -->
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <mainClass>
+            com.github.yash777.apirequestlogging.demo.DemoApplication
+          </mainClass>
+          <jvmArguments>
+            -Dserver.servlet.context-path=${demo.context.path}
+            -Dspringdoc.swagger-ui.path=/swagger-ui/index.html
+            -Dspringdoc.api-docs.path=/v3/api-docs
+            -Dmanagement.endpoints.web.base-path=/actuator
+            -Dmanagement.endpoints.web.exposure.include=health,info,beans,mappings
+            -Dmanagement.endpoint.health.show-details=always
+            -Dapi.request.logging.enabled=true
+            -Dapi.request.logging.live-demo=true
+          </jvmArguments>
+          <!-- Prevent demo-only "provided" deps from being repackaged
+               if repackage goal is ever run manually. -->
+          <excludes>
+            <exclude>
+              <groupId>org.springdoc</groupId>
+              <artifactId>springdoc-openapi-ui</artifactId>
+            </exclude>
+            <exclude>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot-starter-actuator</artifactId>
+            </exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       PROFILES
+       ══════════════════════════════════════════════════════════════════════ -->
+  <profiles>
 
     <!--
-    ╔══════════════════════════════════════════════════════════════════════╗
-    ║  api-request-logging-spring-boot-starter                             ║
-    ║                                                                      ║
-    ║  A zero-boilerplate Spring Boot Auto-Configuration library that      ║
-    ║  captures the full HTTP request/response lifecycle — headers,        ║
-    ║  body, timing, correlation IDs, and third-party call logs —          ║
-    ║  with a single property:                                             ║
-    ║                                                                      ║
-    ║      api.request.logging.enabled=true                                ║
-    ║                                                                      ║
-    ║  Compatible with Spring Boot 2.5+ and Java 8+.                       ║
-    ╚══════════════════════════════════════════════════════════════════════╝
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │  RELEASE PROFILE                                                     │
+    │                                                                      │
+    │  Activated by:                                                       │
+    │    mvn clean deploy -P release                                       │
+    │    mvn release:perform  (automatically via <releaseProfiles> above)  │
+    │                                                                      │
+    │  This profile adds two things that MUST NOT run during local dev:    │
+    │    1. GPG signing    — requires your private key to be present       │
+    │    2. Central upload — requires your Sonatype token in settings.xml  │
+    └──────────────────────────────────────────────────────────────────────┘
     -->
-
-    <groupId>com.github.yash777</groupId>
-    <artifactId>api-request-logging-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
-    <packaging>jar</packaging>
-
-    <name>API Request Logging Spring Boot Starter</name>
-    <description>
-        Spring Boot Auto-Configuration starter that captures full HTTP request/response
-        lifecycle logs including headers, body, timing, correlation IDs, and
-        third-party call logs. Enable with api.request.logging.enabled=true.
-    </description>
-    <url>https://github.com/Yash777/api-request-logging-spring-boot-starter</url>
-
-    <licenses>
-        <license>
-            <name>Apache License, Version 2.0</name>
-            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
-        </license>
-    </licenses>
-
-    <developers>
-        <developer>
-            <id>yash777</id>
-            <name>Yash</name>
-            <url>https://github.com/Yash777</url>
-        </developer>
-    </developers>
-
-    <!-- ════════════════════════════════════════════════════════════════════
-         Parent — Spring Boot BOM for managed dependency versions.
-         Using 2.5.x as the baseline; the starter is tested against 2.5+.
-         ════════════════════════════════════════════════════════════════════ -->
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.0.1.RELEASE</version>  <!-- minimum baseline: 2.0.1.RELEASE, 2.3.3.RELEASE, 2.5.x, 2.7.18 -->
-        <relativePath/>
-    </parent>
-
-    <properties>
-        <java.version>8</java.version>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-
-        <!--
-            Demo application context path:
-              http://localhost:8080/api-request-logging-demo/...
-
-            Passed to the spring-boot-maven-plugin as a JVM system property so
-            it only applies when running  "mvn spring-boot:run"  and is NOT
-            baked into the packaged starter JAR.
-
-            Swagger UI  → http://localhost:8080/api-request-logging-demo/swagger-ui/index.html
-            Actuator    → http://localhost:8080/api-request-logging-demo/actuator/health
-        -->
-        <demo.context.path>/api-request-logging-demo</demo.context.path>
-    </properties>
-
-    <dependencies>
-
-        <!-- ── Core Spring Boot Web (provided — consumer brings it) ──────── -->
-        <!--
-            "provided" scope: we declare this so the IDE/compiler can resolve
-            the Spring Web, Servlet, and StopWatch APIs.  The consumer's Spring
-            Boot project already has this on the classpath; we must NOT package
-            it again to avoid duplicate-class conflicts.
-        -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- ── Auto-Configuration annotation processor ───────────────────── -->
-        <!--
-            Generates META-INF/spring-configuration-metadata.json from
-            @ConfigurationProperties so IDEs show documentation and type-safe
-            hints while the developer types property keys.
-        -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-configuration-processor</artifactId>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- ── Auto-Configuration support (provided) ─────────────────────── -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-autoconfigure</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- ── Jackson — JSON serialisation in RequestLogCollector ─────────── -->
-        <!--
-            ObjectMapper is used to serialise request/response objects to compact
-            JSON strings for log storage.  Jackson is transitively pulled in by
-            spring-boot-starter-web; marking it "provided" avoids double-packaging.
-        -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- ── Test ──────────────────────────────────────────────────────── -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Source: https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-api -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- ══════════════════════════════════════════════════════════════════
-             DEMO-ONLY dependencies  (scope=provided so they are NEVER
-             packaged into the starter JAR that consumers download).
-             These are only needed when running the built-in demo application
-             locally via:  mvn spring-boot:run
-             ══════════════════════════════════════════════════════════════════ -->
-
-        <!-- ── Springdoc OpenAPI / Swagger UI ────────────────────────────────
-             Exposes interactive API docs at:
-               http://localhost:8080/api-request-logging-demo/swagger-ui/index.html
-             JSON spec at:
-               http://localhost:8080/api-request-logging-demo/v3/api-docs
-
-             springdoc-openapi-ui 1.7.0 supports Spring Boot 2.5 – 2.7.
-             (For Spring Boot 3.x use springdoc-openapi-starter-webmvc-ui 2.x instead.)
-
-             "provided" scope: present on the classpath when YOU run the demo,
-             but excluded from the published starter JAR — consumers choose
-             their own Swagger / OpenAPI library.
-        -->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
-            <version>1.7.0</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- ── Spring Boot Actuator ───────────────────────────────────────────
-             Exposes management endpoints at:
-               http://localhost:8080/api-request-logging-demo/actuator/health
-               http://localhost:8080/api-request-logging-demo/actuator/info
-
-             "provided" scope: same reasoning as springdoc above — the demo
-             uses it, but it must not be bundled into the starter JAR.
-             Consumer applications bring their own actuator if they need it.
-        -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-    </dependencies>
-
-    <build>
+    <profile>
+      <id>release</id>
+      <build>
         <plugins>
-            <!-- Compile at Java 8 level -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
+
+          <!-- ── GPG signing — REQUIRED by Maven Central ─────────────────
+               Signs every artifact with a detached .asc signature file.
+               gpg.keyname          → from <properties> above (your key ID)
+               gpg.passphraseServerId → maps to <server> in settings.xml:
+                 <server>
+                   <id>Yash@CentralPortal</id>
+                   <passphrase>{encrypted-passphrase}</passphrase>
+                 </server>
+
+               <doubleHyphen>pinentry-mode loopback: suppresses interactive TTY prompt;
+               essential for CI/CD pipelines (GitHub Actions, Jenkins, etc.)
+               ──────────────────────────────────────────────────────────── -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>${maven-gpg-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                  <keyname>${gpg.keyname}</keyname>
+                  <passphraseServerId>${gpg.passphraseServerId}</passphraseServerId>
+                  <!-- Prevents interactive GPG dialog — required for CI -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
                 </configuration>
-            </plugin>
+              </execution>
+            </executions>
+          </plugin>
 
-            <!--
-                maven-jar-plugin — add the Auto-Configuration registration file
-                to the MANIFEST so Spring Boot picks it up via the SPI mechanism.
-                (spring.factories for Boot 2.x / AutoConfiguration.imports for Boot 3.x)
-            -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <configuration>
-                    <archive>
-                        <manifestEntries>
-                            <Spring-Boot-Auto-Configuration-Import>
-                                com.github.yash777.apirequestlogging.autoconfigure.ApiRequestLoggingAutoConfiguration
-                            </Spring-Boot-Auto-Configuration-Import>
-                        </manifestEntries>
-                    </archive>
-                </configuration>
-            </plugin>
+          <!-- ── Sonatype Central Portal publishing ──────────────────────
+               Replaces the legacy nexus-staging-maven-plugin (used in
+               SeleniumWebDrivers with oss.sonatype.org — now sunset).
 
-            <!-- Source JAR — required for Maven Central -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-source-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>attach-sources</id>
-                        <goals><goal>jar-no-fork</goal></goals>
-                    </execution>
-                </executions>
-            </plugin>
+               publishingServerId : matches the <server><id> in settings.xml
+                                    and <distributionManagement> above.
+               autoPublish        : automatically promotes the deployment to
+                                    "published" state without manual Portal UI
+                                    intervention (equivalent to the old
+                                    autoReleaseAfterClose=true in Nexus plugin).
+               waitUntil=published: blocks mvn deploy until the artifact is
+                                    fully live on Maven Central — safe for
+                                    release pipelines that tag after deploy.
 
-            <!-- Javadoc JAR — required for Maven Central -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <configuration>
-                    <source>${java.version}</source>
-                    <doclint>none</doclint>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>attach-javadocs</id>
-                        <goals><goal>jar</goal></goals>
-                    </execution>
-                </executions>
-            </plugin>
+               checksums=all      : generates MD5, SHA1, SHA256, SHA512
+                                    (all required or accepted by Central).
+               ──────────────────────────────────────────────────────────── -->
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>${central-publishing-plugin.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>${sonatype.central.serverId}</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+              <checksums>all</checksums>
+              <!-- Deployment name visible in central.sonatype.com/publishing/deployments -->
+              <deploymentName>
+                ${project.artifactId}-${project.version}
+              </deploymentName>
+            </configuration>
+          </plugin>
 
-            <!-- ── Spring Boot Maven Plugin ────────────────────────────────────
-                 Used only for:  mvn spring-boot:run  (runs the demo app locally)
-                 The repackage goal is deliberately NOT bound so that the published
-                 artifact remains a plain library JAR, not an executable fat JAR.
-
-                 JVM args inject the context path and springdoc swagger-path at
-                 demo run-time only — these are NOT compiled into any class file
-                 and have zero effect on the starter JAR that consumers download.
-
-                 Context path:  /api-request-logging-demo
-                 ┌─────────────────────────────────────────────────────────────┐
-                 │  Swagger UI → http://localhost:8080/                        │
-                 │               api-request-logging-demo/swagger-ui/index.html│
-                 │  API docs   → http://localhost:8080/                        │
-                 │               api-request-logging-demo/v3/api-docs          │
-                 │  Actuator   → http://localhost:8080/                        │
-                 │               api-request-logging-demo/actuator/health      │
-                 └─────────────────────────────────────────────────────────────┘
-            -->
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <!--
-                        mainClass — points to the demo DemoApplication.
-                        Required because this module also contains non-demo
-                        classes; without it Spring Boot may fail to detect
-                        the main class automatically.
-                    -->
-                    <mainClass>
-                        com.github.yash777.apirequestlogging.demo.DemoApplication
-                    </mainClass>
-
-                    <!--
-                        jvmArguments — injected ONLY during "mvn spring-boot:run".
-                        Equivalent to adding these lines to application.properties
-                        but scoped to the demo run so they never pollute the JAR.
-
-                        server.servlet.context-path
-                            Sets the URL prefix for every endpoint.
-
-                        springdoc.swagger-ui.path
-                            Overrides the default /swagger-ui.html path so the
-                            Swagger UI is served at /swagger-ui/index.html
-                            (consistent with springdoc 1.7.x defaults).
-
-                        springdoc.api-docs.path
-                            Keeps the OpenAPI JSON at /v3/api-docs (default)
-                            but makes it explicit here for clarity.
-
-                        management.endpoints.web.base-path
-                            Actuator endpoints are served under /actuator
-                            relative to the context path, giving:
-                            /api-request-logging-demo/actuator/health
-
-                        api.request.logging.enabled
-                            Ensures the starter is ON when running the demo.
-                    -->
-                    <jvmArguments>
-                        -Dserver.servlet.context-path=${demo.context.path}
-                        -Dspringdoc.swagger-ui.path=/swagger-ui/index.html
-                        -Dspringdoc.api-docs.path=/v3/api-docs
-                        -Dmanagement.endpoints.web.base-path=/actuator
-                        -Dmanagement.endpoints.web.exposure.include=health,info,beans,mappings
-                        -Dmanagement.endpoint.health.show-details=always
-                        -Dapi.request.logging.enabled=true
-                        -Dapi.request.logging.live-demo=true
-                    </jvmArguments>
-
-                    <!--
-                        excludes — prevent the demo-only "provided" dependencies
-                        (springdoc, actuator) from being repackaged into the JAR
-                        if the repackage goal is ever run manually.
-                    -->
-                    <excludes>
-                        <exclude>
-                            <groupId>org.springdoc</groupId>
-                            <artifactId>springdoc-openapi-ui</artifactId>
-                        </exclude>
-                        <exclude>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-actuator</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
-            </plugin>
         </plugins>
-    </build>
+      </build>
+    </profile>
+
+  </profiles>
 
 </project>
