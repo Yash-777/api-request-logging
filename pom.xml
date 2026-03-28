@@ -195,15 +195,19 @@
     <maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
     <central-publishing-plugin.version>0.9.0</central-publishing-plugin.version>
 
-    <!-- ── GPG signing ──────────────────────────────────────────────────
-         gpg.keyname         : last 16 hex chars of your GPG key fingerprint.
-                               Replace XXXXXXXXXXXXXXXX with your actual key ID.
-         gpg.passphraseServerId : maps to a <server> entry in ~/.m2/settings.xml
-                               whose <passphrase> holds your GPG passphrase
-                               (same pattern as SeleniumWebDrivers Yash@Sonatype).
+    <!-- ── GPG signing — key identity and passphrase server ───────────────
+         INTENTIONALLY NOT SET HERE.
+         gpg.keyname and gpg.passphraseServerId are developer-specific secrets.
+         They are defined in ~/.m2/settings.xml under a <profile> so they never
+         appear in version-controlled source code.
+
+         The maven-gpg-plugin in the <release> profile below reads:
+           ${gpg.keyname}            — injected from settings.xml <profile>
+           ${gpg.passphraseServerId} — injected from settings.xml <profile>
+
+         See ~/.m2/settings.xml (provided separately) for the values.
+         See: https://maven.apache.org/guides/mini/guide-encryption.html
          ──────────────────────────────────────────────────────────────── -->
-    <gpg.keyname>XXXXXXXXXXXXXXXX</gpg.keyname>
-    <gpg.passphraseServerId>Yash@CentralPortal</gpg.passphraseServerId>
 
     <!-- ── SCM authentication ───────────────────────────────────────────
          project.scm.id maps to a <server> in settings.xml used by the
@@ -412,6 +416,13 @@
             <checkModificationExclude>.gitignore</checkModificationExclude>
             <checkModificationExclude>README.md</checkModificationExclude>
             <checkModificationExclude>LICENSE</checkModificationExclude>
+            
+            <checkModificationExclude>.project</checkModificationExclude>
+            <checkModificationExclude>.classpath</checkModificationExclude>
+            <checkModificationExclude>.settings/</checkModificationExclude>
+            <checkModificationExclude>.idea/</checkModificationExclude>
+            <checkModificationExclude>*.iml</checkModificationExclude>
+            <checkModificationExclude>.factorypath</checkModificationExclude>
           </checkModificationExcludes>
         </configuration>
       </plugin>
@@ -487,15 +498,27 @@
 
           <!-- ── GPG signing — REQUIRED by Maven Central ─────────────────
                Signs every artifact with a detached .asc signature file.
-               gpg.keyname          → from <properties> above (your key ID)
-               gpg.passphraseServerId → maps to <server> in settings.xml:
-                 <server>
-                   <id>Yash@CentralPortal</id>
-                   <passphrase>{encrypted-passphrase}</passphrase>
-                 </server>
 
-               <doubleHyphen>pinentry-mode loopback: suppresses interactive TTY prompt;
-               essential for CI/CD pipelines (GitHub Actions, Jenkins, etc.)
+               HOW THE VALUES ARE RESOLVED:
+               ┌───────────────────────────┬─────────────────────────────────────────────────┐
+               │ Plugin config element     │ Resolved from                                   │
+               ├───────────────────────────┼─────────────────────────────────────────────────┤
+               │ <keyname>${gpg.keyname}   │ settings.xml → <profiles><profile id=release>   │
+               │                           │   → <properties><gpg.keyname>                   │
+               ├───────────────────────────┼─────────────────────────────────────────────────┤
+               │ <passphraseServerId>      │ settings.xml → <profiles><profile id=release>   │
+               │ ${gpg.passphraseServerId} │   → <properties><gpg.passphraseServerId>        │
+               │                           │   which points to <servers><server id=...>      │
+               │                           │   → <passphrase>YOUR_GPG_PASSPHRASE</passphrase>│
+               └───────────────────────────┴─────────────────────────────────────────────────┘
+
+               WHY in settings.xml and not here:
+               gpg.keyname is developer-specific (your fingerprint, not the project's).
+               Passphrase is a secret — must never be in version-controlled pom.xml.
+               Using settings.xml <profile> lets each developer use their own key.
+
+               <doubleHyphen>pinentry-mode loopback: suppresses interactive TTY PIN dialog;
+               required for CI/CD (GitHub Actions, Jenkins) and recommended locally.
                ──────────────────────────────────────────────────────────── -->
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
