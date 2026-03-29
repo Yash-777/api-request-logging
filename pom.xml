@@ -26,7 +26,6 @@
   <!-- ══════════════════════════════════════════════════════════════════════
        GAV COORDINATES
        groupId  : io.github.yash-777 — verified GitHub namespace on
-       groupId  : io.github.yashwanth.merugu — verified GitHub namespace on
                   central.sonatype.com (see SETUP GUIDE below).
                   NOTE: Previously com.github.yash777 was used in
                   SeleniumWebDrivers; io.github.* is the current
