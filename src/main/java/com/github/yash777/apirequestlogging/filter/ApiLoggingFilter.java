@@ -140,7 +140,7 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
      * @return {@code true} to skip this filter; {@code false} to proceed
      */
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
+    public boolean shouldNotFilter(HttpServletRequest request) {
 
         // 1. Skip CORS pre-flight
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
