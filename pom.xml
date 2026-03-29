@@ -26,6 +26,7 @@
   <!-- ══════════════════════════════════════════════════════════════════════
        GAV COORDINATES
        groupId  : io.github.yash-777 — verified GitHub namespace on
+       groupId  : io.github.yashwanth.merugu — verified GitHub namespace on
                   central.sonatype.com (see SETUP GUIDE below).
                   NOTE: Previously com.github.yash777 was used in
                   SeleniumWebDrivers; io.github.* is the current
@@ -35,7 +36,7 @@
        artifactId: matches the GitHub repository name for discoverability.
        version  : SemVer, no -SNAPSHOT suffix allowed for Central releases.
        ══════════════════════════════════════════════════════════════════════ -->
-  <groupId>io.github.yash-777</groupId>
+  <groupId>io.github.yashwanth.merugu</groupId>
   <artifactId>api-request-logging-spring-boot-starter</artifactId>
   <version>1.0.0</version>
   <packaging>jar</packaging>
