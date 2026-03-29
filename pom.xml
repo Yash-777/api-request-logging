@@ -58,7 +58,7 @@
   <url>https://github.com/Yash-777/api-request-logging</url>
 
   <!-- Year the project was first created — informational metadata. -->
-  <inceptionYear>2025</inceptionYear>
+  <inceptionYear>2026</inceptionYear>
 
   <!-- ── Organization ────────────────────────────────────────────────── -->
   <organization>
@@ -424,6 +424,7 @@
             <checkModificationExclude>*.iml</checkModificationExclude>
             <checkModificationExclude>.factorypath</checkModificationExclude>
             <checkModificationExclude>*.7z</checkModificationExclude>
+            <checkModificationExclude>settings.xml</checkModificationExclude>
           </checkModificationExcludes>
         </configuration>
       </plugin>
