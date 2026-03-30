@@ -35,7 +35,7 @@
        artifactId: matches the GitHub repository name for discoverability.
        version  : SemVer, no -SNAPSHOT suffix allowed for Central releases.
        ══════════════════════════════════════════════════════════════════════ -->
-  <groupId>io.github.yashwanth.merugu</groupId>
+  <groupId>io.github.yash-777</groupId>
   <artifactId>api-request-logging-spring-boot-starter</artifactId>
   <version>1.0.0</version>
   <packaging>jar</packaging>
