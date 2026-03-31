@@ -37,7 +37,7 @@
        ══════════════════════════════════════════════════════════════════════ -->
   <groupId>io.github.yash-777</groupId>
   <artifactId>api-request-logging-spring-boot-starter</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <packaging>jar</packaging>
 
   <!-- ── Human-readable identity ─────────────────────────────────────── -->
@@ -444,6 +444,9 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
+          <skip>true</skip>   <!-- ← ADD THIS — prevents repackage into fat JAR -->
+          
+          <!-- keep your existing jvmArguments for mvn spring-boot:run -->
           <mainClass>
             com.github.yash777.apirequestlogging.demo.DemoApplication
           </mainClass>
@@ -455,7 +458,6 @@
             -Dmanagement.endpoints.web.exposure.include=health,info,beans,mappings
             -Dmanagement.endpoint.health.show-details=always
             -Dapi.request.logging.enabled=true
-            -Dapi.request.logging.live-demo=true
           </jvmArguments>
           <!-- Prevent demo-only "provided" deps from being repackaged
                if repackage goal is ever run manually. -->

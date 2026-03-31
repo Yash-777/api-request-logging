@@ -90,7 +90,7 @@ public class DemoApplication {
      * <p>Read by
      * {@link com.github.yash777.apirequestlogging.demo.condition.DemoEnvironmentCondition#matches}
      * during Spring's application-context refresh phase to decide whether demo
-     * beans ({@code OrderController}, {@code OrderService}, …) should be created.</p>
+     * beans ({@code OrderController}, {@code OrderService}, etc.) should be created.</p>
      *
      * <p><strong>Thread safety:</strong> written once in {@link #main(String[])}
      * (single-threaded JVM startup) <em>before</em> {@code SpringApplication.run()}
@@ -124,19 +124,12 @@ public class DemoApplication {
      * <h4>Startup sequence — why order matters</h4>
      * <ol>
      *   <li>
-     *     <strong>Set {@link System#setProperty} flags</strong> — done
-     *     <em>before</em> {@code SpringApplication.run()} so that
-     *     {@link com.github.yash777.apirequestlogging.demo.condition.DemoEnvironmentCondition}
-     *     can read them from the Spring {@link org.springframework.core.env.Environment}
-     *     during the very first context-refresh pass.  If set after {@code run()},
-     *     Spring would have already evaluated all {@code @Conditional} annotations
-     *     and the demo beans would be absent.
-     *   </li>
-     *   <li>
-     *     <strong>Set {@code nonConsumer = true}</strong> — the static boolean
-     *     that {@code DemoEnvironmentCondition.matches()} uses as its definitive
-     *     answer.  Setting it before {@code run()} provides the same
-     *     happens-before guarantee as the system properties.
+     *     <strong>Set {@code nonConsumer = true}</strong> — done <em>before</em>
+     *     {@code SpringApplication.run()} so that
+     *     {@link com.github.yash777.apirequestlogging.demo.condition.DemoEnvironmentCondition#matches}
+     *     returns {@code true} during the very first context-refresh pass.
+     *     If set after {@code run()}, Spring would have already evaluated all
+     *     {@code @Conditional} annotations and the demo beans would be absent.
      *   </li>
      *   <li>
      *     <strong>{@code SpringApplication.run()}</strong> — starts the full
@@ -145,60 +138,25 @@ public class DemoApplication {
      *   </li>
      * </ol>
      *
-     * <h4>System properties set in this method</h4>
-     * <table border="1" cellpadding="6">
-     *   <tr><th>Key</th><th>Value</th><th>Read by</th></tr>
-     *   <tr>
-     *     <td>{@code internal.demo.bean.active}</td>
-     *     <td>{@code "true"}</td>
-     *     <td>Reserved for future conditional use; currently informational</td>
-     *   </tr>
-     *   <tr>
-     *     <td>{@code internal.app.non-consumer}</td>
-     *     <td>{@code "true"}</td>
-     *     <td>{@link com.github.yash777.apirequestlogging.demo.condition.DemoEnvironmentCondition}
-     *         — checked alongside the {@code api.request.logging.live-demo} property</td>
-     *   </tr>
-     * </table>
-     *
-     * <h4>Why {@code System.setProperty} and not {@code SpringApplicationBuilder.properties}?</h4>
+     * <h4>Why not {@code SpringApplicationBuilder.properties()}?</h4>
      * <p>{@code SpringApplicationBuilder.properties()} injects values into the Spring
      * {@link org.springframework.core.env.Environment} after the
      * {@code ApplicationContext} starts building — by that point some
      * {@code @Conditional} annotations may have already been evaluated.
-     * {@link System#setProperty} writes to the JVM system-property layer, which
-     * Spring reads at the very beginning of context refresh via
-     * {@code SystemEnvironmentPropertySource}, ensuring the flags are visible
-     * to all {@code Condition} evaluations.</p>
-     *
-     * <h4>Alternative (works equally well)</h4>
-     * <pre>
-     * new SpringApplicationBuilder(DemoApplication.class)
-     *     .properties("internal.app.non-consumer=true")
-     *     .run(args);
-     * </pre>
-     * <p>This is the idiomatic Spring Boot way and also sets the property before
-     * condition evaluation.  Both approaches are equivalent.</p>
+     * Setting the static {@code nonConsumer} flag directly before {@code run()}
+     * guarantees it is visible to {@link DemoEnvironmentCondition#matches} on every
+     * evaluation without relying on property-source ordering.</p>
      *
      * @param args command-line arguments forwarded verbatim to
      *             {@link SpringApplication#run(Class, String...)}
      */
     public static void main(String[] args) {
-        // ── Step 1: Set JVM system properties BEFORE Spring starts ────────
-        // DemoEnvironmentCondition reads these during @Conditional evaluation
-        // inside SpringApplication.run(). They must be set before run() is
-        // called, otherwise Spring evaluates conditions before seeing the flags.
-        System.setProperty("internal.demo.bean.active", "true");
-        System.setProperty("internal.app.non-consumer", "true");
-
-        // ── Step 2: Set the static flag ───────────────────────────────────
-        // DemoEnvironmentCondition.matches() returns this flag as its final
-        // answer. It is the strongest isolation guard: only DemoApplication.main()
+        // Set BEFORE SpringApplication.run() — DemoEnvironmentCondition.matches()
+        // reads this flag as its definitive answer. Only DemoApplication.main()
         // can set it to true, so a consumer application can never accidentally
-        // activate demo beans, regardless of their properties configuration.
+        // activate demo beans regardless of their properties configuration.
         nonConsumer = true;
 
-        // ── Step 3: Start the Spring Boot application ─────────────────────
         SpringApplication.run(DemoApplication.class, args);
     }
 }
