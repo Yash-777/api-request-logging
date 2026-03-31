@@ -6,7 +6,8 @@ A zero-boilerplate Spring Boot Auto-Configuration library that captures the **fu
 api.request.logging.enabled=true
 ```
 
-Compatible with **Spring Boot 2.0.x +** and **Java 8+**. <br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_This project has been tested using Spring Boot version `2.0.1.RELEASE` as the minimum supported version._
+Compatible with **Spring Boot 2.0.x+** and **Java 8+**.
+_Tested using Spring Boot `2.0.1.RELEASE` as the minimum supported version._
 
 ---
 
@@ -48,13 +49,30 @@ Compatible with **Spring Boot 2.0.x +** and **Java 8+**. <br/>&nbsp;&nbsp;&nbsp;
 
 ### 1. Add the dependency
 
+Available on Maven Central — download from any of these locations:
+
+| Repository | Link |
+|------------|------|
+| Sonatype Central (new portal) | [api-request-logging-spring-boot-starter](https://central.sonatype.com/artifact/io.github.yash-777/api-request-logging-spring-boot-starter) |
+| Maven Central (repo1 — canonical) | [1.0.1 directory](https://repo1.maven.org/maven2/io/github/yash-777/api-request-logging-spring-boot-starter/1.0.1/) |
+| mvnrepository.com | [1.0.1 listing](https://mvnrepository.com/artifact/io.github.yash-777/api-request-logging-spring-boot-starter/1.0.1) |
+
 ```xml
 <dependency>
-    <groupId>com.github.yash777</groupId>
+    <groupId>io.github.yash-777</groupId>
     <artifactId>api-request-logging-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
+
+> **Note:** Version `1.0.0` was published as an executable fat JAR (`BOOT-INF/classes/…`) by mistake.
+> Spring Boot's auto-configuration scanner cannot find classes inside `BOOT-INF/classes/`, which causes:
+> ```
+> java.io.FileNotFoundException: class path resource
+>   [com/github/yash777/apirequestlogging/autoconfigure/ApiRequestLoggingAutoConfiguration.class]
+>   cannot be opened because it does not exist
+> ```
+> Use **`1.0.1`** which is correctly packaged as a plain library JAR (`com/…` at the root).
 
 ### 2. Enable in `application.properties`
 
@@ -91,6 +109,7 @@ api:
       request-id-headers:
         - X-Request-ID
         - request_id
+        - requestId
         - X-Correlation-ID
         - traceparent
       exclude-paths:
@@ -158,19 +177,32 @@ public class PaymentService {
     }
 
     public PaymentResponse charge(PaymentRequest request) {
-
-        // Each call to buildRetryKey stamps the current time.
-        // If you retry, each attempt gets its own timestamped key → separate log entry.
+        // buildRetryKey stamps the current time → each retry gets its own entry
         String key = collector.buildRetryKey("PaymentGateway/charge");
 
-        collector.addLog(key, "request", request);           // log before HTTP call
-        PaymentResponse res = gateway.post(request);         // actual HTTP call
-        collector.addLog(key, "response", res);              // log after HTTP call
+        collector.addLog(key, RequestLogCollector.LOG_REQUEST, request);   // before call
 
+        PaymentResponse res = null;
+        try {
+            res = gateway.post(request);                                    // actual HTTP call
+        } catch (Exception e) {
+            // Stack trace is automatically truncated to 5 lines
+            collector.addLog(key, RequestLogCollector.LOG_EXCEPTION, e);
+        } finally {
+            collector.addLog(key, RequestLogCollector.LOG_RESPONSE, res);  // null-safe
+        }
         return res;
     }
 }
 ```
+
+### Standard inner-key constants
+
+| Constant | Value | When to use |
+|----------|-------|-------------|
+| `RequestLogCollector.LOG_REQUEST` | `"request"` | Outgoing payload — log before the HTTP call |
+| `RequestLogCollector.LOG_RESPONSE` | `"response"` | Incoming response — log in `finally` block (null-safe) |
+| `RequestLogCollector.LOG_EXCEPTION` | `"exception"` | Caught `Throwable` — stack trace auto-truncated to 5 lines |
 
 ### Convenience method (no retry)
 
@@ -183,14 +215,13 @@ collector.addRequestResponseLog("InventoryService/check", requestObj, responseOb
 ```java
 for (int attempt = 1; attempt <= 3; attempt++) {
     String key = collector.buildRetryKey("PaymentGateway/charge");  // new timestamp each time
-    collector.addLog(key, "attempt", attempt);
-    collector.addLog(key, "request", request);
+    collector.addLog(key, RequestLogCollector.LOG_REQUEST, request);
     try {
         PaymentResponse res = gateway.post(request);
-        collector.addLog(key, "response", res);
+        collector.addLog(key, RequestLogCollector.LOG_RESPONSE, res);
         return res;
     } catch (Exception e) {
-        collector.addLog(key, "error", e.getMessage());
+        collector.addLog(key, RequestLogCollector.LOG_EXCEPTION, e);
     }
 }
 ```
@@ -240,6 +271,8 @@ Order  -100   Spring Security (if present)
 
 Both filters are registered via `FilterRegistrationBean` (not `@Order`) to prevent double-registration.
 
+For a deep-dive on filter ordering, `@RequestScope` internals, `HIGHEST_PRECEDENCE` traps, and Spring Security's two-layer architecture see the [Filter Order Wiki](https://github.com/Yash777/api-request-logging-spring-boot-starter/wiki/Filter-Execution-Order).
+
 ---
 
 ## StopWatch Version Compatibility
@@ -248,169 +281,68 @@ Both filters are registered via `FilterRegistrationBean` (not `@Order`) to preve
 |-------------|-----------------|-----------------|
 | 2.0.x       | 5.0.x           | `getTotalTimeMillis()` ✅ |
 | 2.3.x       | 5.2.x           | `getTotalTimeNanos()` ✅ (added in 5.2) |
-| 2.5.x – 3.x | 5.3.x / 6.x     | Both ✅ |
+| 2.5.x – 3.x | 5.3.x / 6.x    | Both ✅ |
 
-This starter uses `getTotalTimeMillis()` for broadest compatibility. If you are on Spring Boot 2.3+ and want nanosecond precision, you can fork `ApiLoggingFilter` and replace:
+This starter uses `getTotalTimeMillis()` for broadest compatibility. If you are on Spring Boot 2.3+ and want nanosecond precision, replace the call in `ApiLoggingFilter`:
 
 ```java
 // Current (millis — works on all versions):
 long totalMillis = sw.getTotalTimeMillis();
-formatElapsed(totalMillis);
 
 // Optional upgrade (nanos — requires Spring Boot 2.3+ / Spring 5.2+):
-long totalNanos = sw.getTotalTimeNanos();
-formatElapsed(TimeUnit.NANOSECONDS.toMillis(totalNanos));
+long totalMillis = TimeUnit.NANOSECONDS.toMillis(sw.getTotalTimeNanos());
 ```
 
 ---
 
 ## Running the Demo Application
 
-The starter ships with a built-in demo that includes `OrderController`, `PaymentController`, `OrderService`, and `PaymentService`.
+The starter ships with a built-in demo (`OrderController`, `PaymentController`, `OrderService`, `PaymentService`) that is activated **only** when you run this project directly — it is never registered in a consumer application's context.
 
 ```bash
-# Clone and build
 git clone https://github.com/Yash777/api-request-logging-spring-boot-starter.git
 cd api-request-logging-spring-boot-starter
 mvn spring-boot:run
 ```
 
-### Try the endpoints
+### Demo endpoints
 
 ```bash
-# 1. Create an order (full chain: INCOMING + InventoryService + PaymentGateway)
-curl -X POST http://localhost:8080/api/orders \
+# 1. Create an order (INCOMING + InventoryService + PaymentGateway)
+curl -X POST http://localhost:8080/api-request-logging-demo/api/orders \
      -H "Content-Type: application/json" \
      -H "X-Request-ID: my-trace-001" \
      -d '{"customerId":"C-101","itemName":"Laptop","amount":999.99}'
 
 # 2. Get order by ID (INCOMING + OrderDB lookup)
-curl http://localhost:8080/api/orders/ORD-ABC12345 \
+curl http://localhost:8080/api-request-logging-demo/api/orders/ORD-ABC12345 \
      -H "X-Request-ID: my-trace-002"
 
 # 3. Direct payment charge (INCOMING + PaymentGateway/charge)
-curl -X POST http://localhost:8080/api/payments/charge \
+curl -X POST http://localhost:8080/api-request-logging-demo/api/payments/charge \
      -H "Content-Type: application/json" \
      -H "X-Request-ID: my-trace-003" \
      -d '{"orderId":"ORD-99","amount":250.00}'
 
 # 4. Payment status check (INCOMING + PaymentGateway/status)
-curl http://localhost:8080/api/payments/status/TXN-ABCD1234 \
+curl http://localhost:8080/api-request-logging-demo/api/payments/status/TXN-ABCD1234 \
      -H "X-Request-ID: my-trace-004"
 
-# 5. Test fallback correlation header
-curl -X POST http://localhost:8080/api/orders \
+# 5. Fallback correlation header (request_id instead of X-Request-ID)
+curl -X POST http://localhost:8080/api-request-logging-demo/api/orders \
      -H "Content-Type: application/json" \
      -H "request_id: fallback-header-test" \
      -d '{"customerId":"C-202","itemName":"Mouse","amount":29.99}'
 
-# 6. Actuator health — excluded, no logging overhead
-curl http://localhost:8080/actuator/health
+# 6. Actuator health — excluded from logging
+curl http://localhost:8080/api-request-logging-demo/actuator/health
 ```
 
-#### endpoints - loggs
-```log
-=========== Request Logs [req-id: my-trace-001] ===========
-── INCOMING
-   requestId: my-trace-001
-   threadName: http-nio-8080-exec-2
-   url: /api/orders
-   httpMethod: POST
-   timestamp: 26/3/2026, 11:47:18 am
-   headers: {"content-type":"application/json","x-request-id":"my-trace-001","user-agent":"PostmanRuntime/7.52.0","accept":"*/*","cache-control":"no-cache","postman-token":"1c61a106-8c52-4b8f-be7b-a06e2c39800b","host":"localhost:8080","accept-encoding":"gzip, deflate, br","connection":"keep-alive","content-length":"62"}
-   requestBody: {"customerId":"C-101","itemName":"Laptop","amount":999.99} 
-   responseStatus: 200
-   responseBody: {"orderId":"ORD-DED4B762","status":"CONFIRMED","customerId":"C-101","itemName":"Laptop","amount":999.99,"transactionId":"TXN-9249B0EB","requestId":"my-trace-001"}
-   requestProcessedTime: 0h 0m 0s 309ms
+### How demo beans are isolated from consumer apps
 
-── InventoryService/reserve [11:47:19.219]
-   itemName: Laptop
-   reserved: true
+Demo beans carry `@ConditionalOnDemoEnvironment`, which delegates to `DemoEnvironmentCondition`. That condition returns `DemoApplication.getNonConsumer()` — a static flag set to `true` only inside `DemoApplication.main()` before `SpringApplication.run()` is called.
 
-── PaymentGateway/charge [11:47:19.242]
-   request: {"orderId":"ORD-DED4B762","amount":999.99,"currency":"INR"}
-   response: {"txnId":"TXN-9249B0EB","status":"SUCCESS","orderId":"ORD-DED4B762","amount":999.99}
-
-════════════════════════════════════════════════════════
-
-=========== Request Logs [req-id: my-trace-002] ===========
-── INCOMING
-   requestId: my-trace-002
-   threadName: http-nio-8080-exec-10
-   url: /api/orders/ORD-ABC12345
-   httpMethod: GET
-   timestamp: 26/3/2026, 11:51:57 am
-   headers: {"x-request-id":"my-trace-002","user-agent":"PostmanRuntime/7.52.0","accept":"*/*","cache-control":"no-cache","postman-token":"1344d27b-4f07-4a4f-be19-8910e3ae7e14","host":"localhost:8080","accept-encoding":"gzip, deflate, br","connection":"keep-alive"}
-   responseStatus: 200
-   responseBody: {"orderId":"ORD-ABC12345","status":"CONFIRMED","customerId":"C-101","itemName":"Laptop","amount":999.99,"transactionId":"TXN-DEMO1234","requestId":"my-trace-002"}
-   requestProcessedTime: 0h 0m 0s 11ms
-
-── OrderDB/findById [11:51:57.723]
-   query: SELECT * FROM orders WHERE id = 'ORD-ABC12345'
-   rowsFound: 1
-
-════════════════════════════════════════════════════════
-
-=========== Request Logs [req-id: my-trace-003] ===========
-── INCOMING
-   requestId: my-trace-003
-   threadName: http-nio-8080-exec-3
-   url: /api/payments/charge
-   httpMethod: POST
-   timestamp: 26/3/2026, 11:54:12 am
-   headers: {"content-type":"application/json","x-request-id":"my-trace-003","user-agent":"PostmanRuntime/7.52.0","accept":"*/*","cache-control":"no-cache","postman-token":"5f3c8a57-2204-4b0c-82d5-15ecd9bf689e","host":"localhost:8080","accept-encoding":"gzip, deflate, br","connection":"keep-alive","content-length":"36"}
-   requestBody: {"orderId":"ORD-99","amount":250.00}
-   responseStatus: 200
-   responseBody: {"txnId":"TXN-CC648529","status":"SUCCESS","orderId":"ORD-99","amount":250.0}
-   requestProcessedTime: 0h 0m 0s 36ms
-
-── PaymentGateway/charge [11:54:12.601]
-   request: {"orderId":"ORD-99","amount":250.0,"currency":null}
-   response: {"txnId":"TXN-CC648529","status":"SUCCESS","orderId":"ORD-99","amount":250.0}
-
-════════════════════════════════════════════════════════
-
-=========== Request Logs [req-id: my-trace-004] ===========
-── INCOMING
-   requestId: my-trace-004
-   threadName: http-nio-8080-exec-4
-   url: /api/payments/status/TXN-ABCD1234
-   httpMethod: GET
-   timestamp: 26/3/2026, 11:55:10 am
-   headers: {"x-request-id":"my-trace-004","user-agent":"PostmanRuntime/7.52.0","accept":"*/*","cache-control":"no-cache","postman-token":"3f3b0c9d-1f88-4ece-bfa4-9c27b24ab075","host":"localhost:8080","accept-encoding":"gzip, deflate, br","connection":"keep-alive"}
-   responseStatus: 200
-   responseBody: {"txnId":"TXN-ABCD1234","status":"CAPTURED","orderId":"ORD-UNKNOWN","amount":0.0}
-   requestProcessedTime: 0h 0m 0s 2ms
-
-── PaymentGateway/status [11:55:10.376]
-   txnId: TXN-ABCD1234
-   response: {"txnId":"TXN-ABCD1234","status":"CAPTURED","orderId":"ORD-UNKNOWN","amount":0.0}
-
-════════════════════════════════════════════════════════
-
-=========== Request Logs [req-id: fallback-header-test] ===========
-── INCOMING
-   requestId: fallback-header-test
-   threadName: http-nio-8080-exec-7
-   url: /api/orders
-   httpMethod: POST
-   timestamp: 26/3/2026, 11:56:31 am
-   headers: {"content-type":"application/json","request_id":"fallback-header-test","user-agent":"PostmanRuntime/7.52.0","accept":"*/*","cache-control":"no-cache","postman-token":"af012637-4715-45b6-8ebd-777acd932629","host":"localhost:8080","accept-encoding":"gzip, deflate, br","connection":"keep-alive","content-length":"56"}
-   requestBody: {"customerId":"C-202","itemName":"Mouse","amount":29.99}
-   responseStatus: 200
-   responseBody: {"orderId":"ORD-4A7F84BC","status":"CONFIRMED","customerId":"C-202","itemName":"Mouse","amount":29.99,"transactionId":"TXN-C38810B9","requestId":"fallback-header-test"}
-   requestProcessedTime: 0h 0m 0s 56ms
-
-── InventoryService/reserve [11:56:31.715]
-   itemName: Mouse
-   reserved: true
-
-── PaymentGateway/charge [11:56:31.736]
-   request: {"orderId":"ORD-4A7F84BC","amount":29.99,"currency":"INR"}
-   response: {"txnId":"TXN-C38810B9","status":"SUCCESS","orderId":"ORD-4A7F84BC","amount":29.99}
-
-════════════════════════════════════════════════════════
-```
+A consumer app's own `main()` never calls `DemoApplication.main()`, so the flag stays `false` and all demo beans (`OrderController`, `OrderService`, etc.) are silently skipped. No property, annotation, or test fixture can replicate the JVM entry-point guarantee.
 
 ---
 
@@ -423,26 +355,25 @@ mvn clean verify
 # Install to local Maven repo (~/.m2)
 mvn clean install
 
-# Generate sources + Javadoc JARs
-mvn clean package
-
 # Deploy to Maven Central (requires GPG key + Sonatype credentials in settings.xml)
 mvn clean deploy -P release
 ```
 
-### Using from another project
+> **Release workflow:** `mvn clean deploy -P release` is the complete release command.
+> `mvn release:prepare` and `mvn release:perform` are **not needed** — they require a
+> `-SNAPSHOT` version in `pom.xml` and an SCM URL, neither of which applies here.
+> The `central-publishing-maven-plugin` handles upload and automatic publication directly.
 
-After `mvn install`, add to any Spring Boot project:
+### Adding to your project (after `mvn install`)
 
 ```xml
 <dependency>
-    <groupId>com.github.yash777</groupId>
+    <groupId>io.github.yash-777</groupId>
     <artifactId>api-request-logging-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
 </dependency>
 ```
 
-Then add to `application.properties`:
 ```properties
 api.request.logging.enabled=true
 ```
@@ -473,8 +404,20 @@ api-request-logging-spring-boot-starter
 │                                               one instance per HTTP request
 │                                               injectable from any @Service / @Component
 │
-└── util/
-    └── TimestampUtils                        ← thread-safe timestamp formatting
+├── util/
+│   └── TimestampUtils                        ← thread-safe timestamp formatting
+│
+└── demo/                                     ← only active when DemoApplication.main() runs
+    ├── DemoApplication                       ← sets nonConsumer=true before SpringApplication.run()
+    ├── condition/
+    │   ├── ConditionalOnDemoEnvironment      ← composed @Conditional annotation
+    │   └── DemoEnvironmentCondition          ← returns DemoApplication.getNonConsumer()
+    ├── controller/
+    │   ├── OrderController
+    │   └── PaymentController
+    └── service/
+        ├── OrderService
+        └── PaymentService
 
 META-INF/
 ├── spring.factories                          ← Spring Boot 2.x SPI registration
@@ -487,12 +430,23 @@ META-INF/
 | Decision | Reason |
 |----------|--------|
 | `@RequestScope` + CGLIB proxy on `RequestLogCollector` | Allows singleton filters/services to hold a reference without thread-safety concerns |
-| `FilterRegistrationBean` instead of `@Order` | Prevents double-registration (Spring Boot auto-registers `@Component` filters and `@Order` together) |
+| `FilterRegistrationBean` instead of `@Order` | Prevents double-registration — Spring Boot auto-registers `@Component` filters and `@Order` together causing the filter to run twice per request |
 | `StopWatch` as local variable | Thread safety by design — each request thread owns its own instance; no synchronisation needed |
 | `ThreadLocal<String> CURRENT_REQUEST_ID` | Zero-injection access to correlation ID from async methods, MDC, utility classes |
 | `@PreDestroy cleanup()` | Removes ThreadLocal to prevent request-ID leaks in Tomcat's thread pool |
+| `DemoApplication.nonConsumer` static flag | The only unforgeable demo isolation guard — set exclusively in `main()` before Spring starts; no property can replicate it |
+| Plain library JAR (not fat JAR) | `spring-boot-maven-plugin` repackage is skipped — classes must be at JAR root for Spring's auto-config scanner to find them |
 | Java 8 compatible | `String.format` not `String.formatted()`, `trim()` not `strip()`, `getTotalTimeMillis()` not `getTotalTimeNanos()` |
 | `provided` scope for `spring-boot-starter-web` | Consumer's classpath already has it; avoids duplicate-class conflicts |
+
+---
+
+## Version History
+
+| Version | Change |
+|---------|--------|
+| `1.0.1` | **Fix:** JAR now published as a plain library JAR. Version `1.0.0` was accidentally packaged as a Spring Boot fat JAR (`BOOT-INF/classes/…`), causing `FileNotFoundException` for `ApiRequestLoggingAutoConfiguration.class` in consumer applications. |
+| `1.0.0` | Initial release — **do not use** (fat JAR packaging defect). |
 
 ---
 
