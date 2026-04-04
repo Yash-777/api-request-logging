@@ -4,7 +4,9 @@
 [![Java 8+](https://img.shields.io/badge/Java-8%2B-blue)](https://www.java.com)
 [![Spring Boot 2.x](https://img.shields.io/badge/Spring%20Boot-2.x-green)](https://spring.io/projects/spring-boot)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue)](https://www.apache.org/licenses/LICENSE-2.0)
-[![SSL PKIX](https://img.shields.io/badge/SSL-PKIX%20Trust-brightgreen)](https://docs.oracle.com/javase/8/docs/technotes/guides/security/certpath/CertPathProgGuide.html)
+[![SLF4J](https://img.shields.io/badge/Logging-SLF4J-orange)](https://www.slf4j.org)
+[![Logback](https://img.shields.io/badge/Logging-Logback-brightgreen)](https://logback.qos.ch)
+[![System.out](https://img.shields.io/badge/Logging-System.out-yellow)](https://docs.oracle.com/javase/8/docs/api/java/io/PrintStream.html)
 
 A zero-boilerplate Spring Boot Auto-Configuration library that captures the **full HTTP request/response lifecycle** — headers, body, timing, correlation IDs, and third-party call logs — activated with a single property.
 
