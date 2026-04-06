@@ -2,6 +2,7 @@ package com.github.yash777.apirequestlogging.demo.controller;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
 import com.github.yash777.apirequestlogging.demo.condition.ConditionalOnDemoEnvironment;
+import com.github.yash777.apirequestlogging.demo.config.DemoConfiguration;
 import com.github.yash777.apirequestlogging.demo.service.OrderService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,7 +60,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/orders")
-@ConditionalOnDemoEnvironment             // Apply your combined 3 conditions here
+@ConditionalOnDemoEnvironment             // Apply your combined conditions here
 public class OrderController {
 
     private final OrderService orderService;
@@ -69,6 +70,9 @@ public class OrderController {
         this.orderService = orderService;
     }
 
+    @Autowired
+    private DemoConfiguration demoConfiguration;
+    
     /**
      * Creates a new order by running the full
      * Order → Inventory → Payment pipeline.
@@ -86,6 +90,7 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@RequestBody OrderRequest request) {
         OrderResponse response = orderService.createOrder(request);
+        demoConfiguration.getWeather();
         return ResponseEntity.ok(response);
     }
 

@@ -1,9 +1,12 @@
 package com.github.yash777.apirequestlogging.collector;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.yash777.apirequestlogging.masking.SecretMaskingUtil;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
 import com.github.yash777.apirequestlogging.util.TimestampUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
@@ -127,8 +130,21 @@ import java.util.UUID;
  *    response:   null
  * </pre>
  *
+ * <h3>v1.1.0 changes</h3>
+ * <ul>
+ *   <li>Log output routed to SLF4J logger ({@code api.request.logging}) at INFO level.
+ *       {@code System.out} is retained as an opt-in fallback via property
+ *       {@code api.request.logging.logger.sysout-enabled=true}.</li>
+ *   <li>Secret masking applied when {@code api.request.logging.mask.enabled=true}.</li>
+ *   <li>New inner-key constants: {@link #LOG_REQUEST}, {@link #LOG_RESPONSE},
+ *       {@link #LOG_EXCEPTION}, {@link #LOG_ERROR_INDICATOR},
+ *       {@link #LOG_CONTROLLER_HANDLER}.</li>
+ *   <li>Exception stack traces truncated to
+ *       {@code api.request.logging.exception.max-lines} (default 5).</li>
+ * </ul>
+ * 
  * @author Yash
- * @since 1.0.0
+ * @since 1.0.0 (SLF4J + masking added in 1.1.0)
  * @see com.github.yash777.apirequestlogging.filter.ApiLoggingFilter
  * @see com.github.yash777.apirequestlogging.filter.RequestBodyCachingFilter
  */
@@ -166,7 +182,8 @@ public class RequestLogCollector {
      * and the first few frames of the call stack — the frames most relevant to
      * application code.</p>
      *
-     * <p>Set to a smaller value (e.g. {@code 3}) for very compact logs, or increase
+     * <p>Configurable via the property {@code api.request.logging.exception.max-lines}.
+     * Set to a smaller value (e.g. {@code 3}) for very compact logs, or increase
      * it if your application has deep call chains that need more context.</p>
      */
     private static final int EXCEPTION_MAX_LINES = 5;
@@ -274,7 +291,7 @@ public class RequestLogCollector {
      * inner-key value.  You may also pass any other {@link Throwable} subclass
      * ({@code RuntimeException}, {@code Error}, etc.).</p>
      */
-    public static final String LOG_EXCEPTION = "exception";
+    public static final String LOG_EXCEPTION = "exceptionStacktrace";
 
     // ── Constants ─────────────────────────────────────────────────────────
 
@@ -286,6 +303,25 @@ public class RequestLogCollector {
      */
     public static final String INCOMING_KEY = "INCOMING";
 
+//    /**
+//     * Inner-key for a caught {@link Throwable}. Stack trace is automatically
+//     * truncated to {@code api.request.logging.exception.max-lines} lines.
+//     */
+//    public static final String LOG_EXCEPTION         = "exceptionStacktrace";
+
+    /**
+     * Inner-key for the short error indicator added to the INCOMING block.
+     * Format: {@code "ERROR:ExceptionSimpleName"}, e.g. {@code "ERROR:NullPointerException"}.
+     */
+    public static final String LOG_ERROR_INDICATOR   = "errorIndicator";
+
+    /**
+     * Inner-key for the AOP-captured controller handler name.
+     * Format: {@code "ControllerClass#methodName"}, e.g. {@code "UserController#listUsers"}.
+     * Written by {@link com.github.yash777.apirequestlogging.aop.ControllerHandlerAspect}.
+     */
+    public static final String LOG_CONTROLLER_HANDLER = "controllerHandler";
+    
     // ── Per-instance state ────────────────────────────────────────────────
     //
     // mapLog  — NOT static. Each @RequestScope instance has its own map.
@@ -299,6 +335,9 @@ public class RequestLogCollector {
     /** Properties injected at construction — drives header resolution. */
     private final ApiRequestLoggingProperties properties;
 
+    /** SLF4J logger — name is driven by {@code api.request.logging.logger.name}. */
+    private Logger log;
+    
     /**
      * Constructor injection — Spring resolves and fully constructs the
      * {@link ApiRequestLoggingProperties} bean before calling this constructor.
@@ -307,6 +346,7 @@ public class RequestLogCollector {
      */
     public RequestLogCollector(ApiRequestLoggingProperties properties) {
         this.properties = properties;
+        this.log = LoggerFactory.getLogger(properties.getLogger().getName());
     }
 
     // ═════════════════════════════════════════════════════════════════════
@@ -506,8 +546,18 @@ public class RequestLogCollector {
                 value = truncateStackTrace((Throwable) value, EXCEPTION_MAX_LINES);
             }
 
+            String serialised = toJson(value);
+
+            // Apply secret masking to string values
+            if (properties.getMask().isEnabled() && serialised != null) {
+                serialised = SecretMaskingUtil.mask(
+                        serialised,
+                        properties.getMask().getFields(),
+                        properties.getMask().getReplacement());
+            }
+            
             mapLog.computeIfAbsent(key, k -> new LinkedHashMap<>())
-                  .put(innerKey, toJson(value));
+                  .put(innerKey, serialised);
         } catch (Exception e) {
             System.err.println("[RequestLogCollector] addLog error  key=" + key
                     + "  innerKey=" + innerKey + " : " + e.getMessage());
@@ -574,50 +624,46 @@ public class RequestLogCollector {
         return mapLog;
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  OUTPUT
+    // ══════════════════════════════════════════════════════════════════
+
     /**
-     * Prints the complete collected log to {@code System.out}.
-     * Called by {@link com.github.yash777.apirequestlogging.filter.ApiLoggingFilter}
-     * in its {@code finally} block once the full request/response cycle has
-     * completed and all 3rd-party calls are recorded.
+     * Prints the complete request log. Called by {@code ApiLoggingFilter} in its
+     * {@code finally} block after all fields (body, timing, 3rd-party calls) are collected.
      *
-     * <h4>Sample output</h4>
-     * <pre>
-     * =========== Request Logs [req-id: f3a1b2c4-...] ===========
-     *
-     * ── INCOMING
-     *    requestId:            f3a1b2c4-d5e6-7890-abcd-ef1234567890
-     *    threadName:           http-nio-8080-exec-3
-     *    url:                  /api/orders/create
-     *    httpMethod:           POST
-     *    timestamp:            23/3/2026, 2:54:43 pm
-     *    headers:              {"content-type":"application/json","host":"..."}
-     *    requestBody:          {"customerId":"C-101","amount":500}
-     *    responseStatus:       200
-     *    responseBody:         {"orderId":"ORD-1","status":"CONFIRMED"}
-     *    requestProcessedTime: 0h 0m 0s 312ms
-     *
-     * ── PaymentGateway/charge [14:32:05.001]
-     *    request:    {"amount":500,"orderId":"ORD-1"}
-     *    response:   {"status":"SUCCESS","txnId":"TXN-99"}
-     *
-     * ════════════════════════════════════════════════════════════
-     * </pre>
+     * <p>Output is routed to the SLF4J logger named by
+     * {@code api.request.logging.logger.name} at INFO level.
+     * Set {@code api.request.logging.logger.sysout-enabled=true} to also
+     * print to {@code System.out} (v1.0.x legacy behaviour).</p>
      */
     public void printLogs() {
-        System.out.println("\n=========== Request Logs [req-id: " + requestId + "] ===========");
+        String output = buildLogString();
+        if (properties.getLogger().isEnabled()) {
+            log.info("{}", output);
+        }
+        if (properties.getLogger().isSysoutEnabled()) {
+            System.out.println(output);
+        }
+    }
+
+    private String buildLogString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n=========== Request Logs [req-id: ").append(requestId).append("] ===========");
         if (mapLog.isEmpty()) {
-            System.out.println("  (no entries)");
+            sb.append("\n  (no entries)");
         } else {
             mapLog.forEach((callKey, details) -> {
-                System.out.println("── " + callKey);
+                sb.append("\n── ").append(callKey);
                 details.forEach((k, v) -> {
                     if (v != null)
-                        System.out.println("   " + k + ": " + v.replaceAll("\\s+", " "));
+                        sb.append("\n   ").append(k).append(": ").append(v.replaceAll("\\s+", " "));
                 });
-                System.out.println();
+                sb.append("\n");
             });
         }
-        System.out.println("════════════════════════════════════════════════════════\n");
+        sb.append("════════════════════════════════════════════════════════\n");
+        return sb.toString();
     }
 
 
@@ -715,7 +761,8 @@ public class RequestLogCollector {
     }
 
     /**
-     * Converts all non-blank request headers to a compact JSON object string.
+     * Serialises all non-blank request headers to a compact JSON object,
+     * applying secret masking to header values when masking is enabled.
      *
      * <p>Headers with null or blank values are silently excluded.
      * Output example:</p>
@@ -724,15 +771,21 @@ public class RequestLogCollector {
      * @param request the current {@link HttpServletRequest}
      * @return JSON object string, or {@code "{}"} on failure
      */
-    private static String headersAsJson(HttpServletRequest request) {
+    private String headersAsJson(HttpServletRequest request) {
         if (request == null) return "{}";
         Map<String, String> map = new LinkedHashMap<>();
         Enumeration<String> names = request.getHeaderNames();
         if (names != null) {
+        	ApiRequestLoggingProperties.MaskProperties maskProps = properties.getMask();
             for (String name : Collections.list(names)) {
                 String value = request.getHeader(name);
                 if (!isBlank(value)) {
-                    map.put(name, value.trim());
+                    if (maskProps.isEnabled()
+                            && SecretMaskingUtil.shouldMaskHeader(name, maskProps.getFields())) {
+                         map.put(name, maskProps.getReplacement());
+                    } else {
+                        map.put(name, value.trim());
+                    }
                 }
             }
         }

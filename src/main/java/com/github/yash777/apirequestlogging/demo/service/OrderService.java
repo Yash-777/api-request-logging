@@ -61,7 +61,7 @@ import java.util.UUID;
  * @see RequestLogCollector
  */
 @Service
-@ConditionalOnDemoEnvironment             // Apply your combined 3 conditions here
+@ConditionalOnDemoEnvironment             // Apply your combined conditions here
 public class OrderService {
 
     /**

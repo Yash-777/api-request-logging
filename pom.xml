@@ -303,6 +303,16 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- AOP — optional. Activates ControllerHandlerAspect automatically when
+            spring-boot-starter-aop is on the consumer's classpath.
+            @ConditionalOnClass(ProceedingJoinPoint.class) guards the aspect.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
   </dependencies>
 
   <!-- ══════════════════════════════════════════════════════════════════════

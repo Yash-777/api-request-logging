@@ -1,6 +1,7 @@
 package com.github.yash777.apirequestlogging.properties;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
 import java.util.Arrays;
 import java.util.List;
@@ -294,4 +295,286 @@ public class ApiRequestLoggingProperties {
     public void setMaxBodyLength(int maxBodyLength) {
         this.maxBodyLength = maxBodyLength;
     }
+    
+    
+    // ── Nested sections ────────────────────────────────────────────────
+
+    @NestedConfigurationProperty
+    private AopProperties aop = new AopProperties();
+
+    @NestedConfigurationProperty
+    private RestTemplateProperties restTemplate = new RestTemplateProperties();
+
+    @NestedConfigurationProperty
+    private LoggerProperties logger = new LoggerProperties();
+
+    @NestedConfigurationProperty
+    private ExceptionProperties exception = new ExceptionProperties();
+
+    @NestedConfigurationProperty
+    private MultipartProperties multipart = new MultipartProperties();
+
+    @NestedConfigurationProperty
+    private MaskProperties mask = new MaskProperties();
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NESTED — AOP
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * AOP settings for automatic controller handler capture.
+     *
+     * <h4>Sample output</h4>
+     * <pre>
+     *   controllerHandler: "UserController#listUsers"
+     * </pre>
+     *
+     * <h4>Required dependency (consumer pom.xml)</h4>
+     * <pre>{@code
+     * <dependency>
+     *     <groupId>org.springframework.boot</groupId>
+     *     <artifactId>spring-boot-starter-aop</artifactId>
+     * </dependency>
+     * }</pre>
+     * <p>If {@code spring-aop} is absent from the classpath the aspect is silently skipped
+     * ({@code @ConditionalOnClass(ProceedingJoinPoint.class)}).</p>
+     */
+    public static class AopProperties {
+        /**
+         * Enable AOP-based automatic capture of the controller handler name.
+         * Requires {@code spring-boot-starter-aop} on the classpath. Default: {@code true}.
+         */
+        private boolean controllerHandlerEnabled = true;
+
+        public boolean isControllerHandlerEnabled() { return controllerHandlerEnabled; }
+        public void setControllerHandlerEnabled(boolean v) { this.controllerHandlerEnabled = v; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NESTED — RestTemplate
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Settings for automatic RestTemplate call capture.
+     *
+     * <p>When {@link #isAutoCaptureEnabled()} is {@code true}, a
+     * {@code BeanPostProcessor} injects a logging interceptor into every
+     * {@code RestTemplate} bean registered in the Spring context.</p>
+     *
+     * <p><strong>Limitation:</strong> only Spring-managed {@code RestTemplate}
+     * beans are intercepted. Instances created with {@code new RestTemplate()}
+     * inside a method body are invisible to Spring and cannot be auto-captured.</p>
+     */
+    public static class RestTemplateProperties {
+        /**
+         * Auto-inject a logging interceptor into all RestTemplate beans.
+         * Default: {@code false}.
+         */
+        private boolean autoCaptureEnabled = false;
+
+        /** Capture RestTemplate request body. Default: {@code true}. */
+        private boolean logRequestBody = true;
+
+        /** Capture RestTemplate response body. Default: {@code true}. */
+        private boolean logResponseBody = true;
+
+        /**
+         * Max characters for RestTemplate bodies. {@code -1} = unlimited.
+         * Default: {@code 4096}.
+         */
+        private int maxBodyLength = 4096;
+
+        public boolean isAutoCaptureEnabled()            { return autoCaptureEnabled; }
+        public void setAutoCaptureEnabled(boolean v)     { this.autoCaptureEnabled = v; }
+        public boolean isLogRequestBody()                { return logRequestBody; }
+        public void setLogRequestBody(boolean v)         { this.logRequestBody = v; }
+        public boolean isLogResponseBody()               { return logResponseBody; }
+        public void setLogResponseBody(boolean v)        { this.logResponseBody = v; }
+        public int getMaxBodyLength()                    { return maxBodyLength; }
+        public void setMaxBodyLength(int v)              { this.maxBodyLength = v; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NESTED — Logger
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Controls where log output is written.
+     *
+     * <h4>Logback / Log4j2 integration</h4>
+     * <pre>
+     * # application.properties
+     * logging.level.api.request.logging=INFO
+     * </pre>
+     * <pre>
+     * &lt;!-- logback.xml — route to a dedicated file --&gt;
+     * &lt;logger name="api.request.logging" level="INFO" additivity="false"&gt;
+     *     &lt;appender-ref ref="REQUEST_LOG_FILE"/&gt;
+     * &lt;/logger&gt;
+     * </pre>
+     */
+    public static class LoggerProperties {
+        /**
+         * Route log output to an SLF4J logger (default {@code true}).
+         * Replaces the v1.0.x {@code System.out.println} output.
+         */
+        private boolean enabled = true;
+
+        /**
+         * Logger name used for SLF4J output. Configure its level and appenders
+         * in {@code logback.xml} / {@code log4j2.xml}. Default: {@code api.request.logging}.
+         */
+        private String name = "api.request.logging";
+
+        /**
+         * Also print to {@code System.out} (legacy behaviour from v1.0.x).
+         * Default: {@code false}.
+         */
+        private boolean sysoutEnabled = false;
+
+        public boolean isEnabled()              { return enabled; }
+        public void setEnabled(boolean v)       { this.enabled = v; }
+        public String getName()                 { return name; }
+        public void setName(String v)           { this.name = v; }
+        public boolean isSysoutEnabled()        { return sysoutEnabled; }
+        public void setSysoutEnabled(boolean v) { this.sysoutEnabled = v; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NESTED — Exception
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Controls how exception stack traces are stored in the log.
+     *
+     * <h4>Sample output</h4>
+     * <pre>
+     *   errorIndicator:     ERROR:NullPointerException
+     *   exceptionStacktrace: java.lang.NullPointerException: null
+     *                          at com.example.UserController.listUsers(UserController.java:25)
+     *                          at ...
+     *                          ... (truncated to 5 lines)
+     * </pre>
+     */
+    public static class ExceptionProperties {
+        /**
+         * Maximum stack-trace lines stored when an exception is logged.
+         * Full traces from Spring/Hibernate are 60–100 lines; 5 lines is enough
+         * to identify the exception class, message, and application frames.
+         * Default: {@code 5}.
+         */
+        private int maxLines = 5;
+
+        public int getMaxLines()    { return maxLines; }
+        public void setMaxLines(int v) { this.maxLines = v; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NESTED — Multipart
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Controls buffering behaviour for multipart and binary request bodies.
+     *
+     * <p>Buffering a large file upload into heap (via {@code ContentCachingRequestWrapper})
+     * for every concurrent request creates GC pressure and risks OOM errors.
+     * When {@link #isSkipBinary()} is {@code true}, the caching wrapper is not applied
+     * to requests whose {@code Content-Type} matches any of the skip patterns.</p>
+     *
+     * <p>When skipped, the log shows:</p>
+     * <pre>
+     *   requestBody: [binary/multipart content skipped — Content-Type: image/png]
+     * </pre>
+     */
+    public static class MultipartProperties {
+        /**
+         * Skip buffering binary and multipart request bodies. Default: {@code true}.
+         */
+        private boolean skipBinary = true;
+
+        /**
+         * {@code Content-Type} prefixes that trigger the skip.
+         * Default: {@code image/, audio/, video/, multipart/, application/octet-stream}.
+         */
+        private List<String> skipContentTypes = Arrays.asList(
+                "image/", "audio/", "video/", "multipart/", "application/octet-stream");
+
+        /**
+         * Whitelist of {@code Content-Type} prefixes whose bodies ARE captured.
+         * When non-empty, only bodies matching this list are buffered (overrides skipBinary).
+         * Example: {@code application/json,application/xml,text/}
+         * Default: empty (whitelist not active).
+         */
+        private List<String> captureOnlyContentTypes = Arrays.asList();
+
+        public boolean isSkipBinary()                    { return skipBinary; }
+        public void setSkipBinary(boolean v)             { this.skipBinary = v; }
+        public List<String> getSkipContentTypes()        { return skipContentTypes; }
+        public void setSkipContentTypes(List<String> v)  { this.skipContentTypes = v; }
+        public List<String> getCaptureOnlyContentTypes() { return captureOnlyContentTypes; }
+        public void setCaptureOnlyContentTypes(List<String> v) { this.captureOnlyContentTypes = v; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NESTED — Mask
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Secret masking applied to request/response bodies and headers before logging.
+     *
+     * <h4>Sample output</h4>
+     * <pre>
+     *   headers:      {"authorization":"***MASKED***","content-type":"application/json"}
+     *   requestBody:  {"username":"john","password":"***MASKED***","amount":500}
+     * </pre>
+     *
+     * <h4>How it works</h4>
+     * <p>Field values matching any name in {@link #getFields()} are replaced with
+     * {@link #getReplacement()} using a case-insensitive regex applied to the stored
+     * JSON string.  The masking happens inside {@code RequestLogCollector} after
+     * JSON serialisation and before storage in the log map.</p>
+     *
+     * <p><strong>Note:</strong> regex-based masking works reliably for flat JSON.
+     * Deeply nested structures may require a Jackson-based approach in a future version.</p>
+     */
+    public static class MaskProperties {
+        /** Enable secret masking. Default: {@code false}. */
+        private boolean enabled = false;
+
+        /**
+         * Field names whose values are masked. Case-insensitive.
+         * Default covers the most common sensitive field names.
+         */
+        private List<String> fields = Arrays.asList(
+                "password", "token", "secret", "authorization",
+                "x-api-key", "api-key", "access-token", "refresh-token",
+                "client-secret", "passwd", "credential");
+
+        /** Value substituted for masked fields. Default: {@code ***MASKED***}. */
+        private String replacement = "***MASKED***";
+
+        public boolean isEnabled()              { return enabled; }
+        public void setEnabled(boolean v)       { this.enabled = v; }
+        public List<String> getFields()         { return fields; }
+        public void setFields(List<String> v)   { this.fields = v; }
+        public String getReplacement()          { return replacement; }
+        public void setReplacement(String v)    { this.replacement = v; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  ROOT GETTERS / SETTERS
+    // ══════════════════════════════════════════════════════════════════
+
+    public AopProperties getAop()                       { return aop; }
+    public void setAop(AopProperties v)                 { this.aop = v; }
+    public RestTemplateProperties getRestTemplate()     { return restTemplate; }
+    public void setRestTemplate(RestTemplateProperties v) { this.restTemplate = v; }
+    public LoggerProperties getLogger()                 { return logger; }
+    public void setLogger(LoggerProperties v)           { this.logger = v; }
+    public ExceptionProperties getException()           { return exception; }
+    public void setException(ExceptionProperties v)     { this.exception = v; }
+    public MultipartProperties getMultipart()           { return multipart; }
+    public void setMultipart(MultipartProperties v)     { this.multipart = v; }
+    public MaskProperties getMask()                     { return mask; }
+    public void setMask(MaskProperties v)               { this.mask = v; }
 }

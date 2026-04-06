@@ -62,7 +62,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/payments")
-@ConditionalOnDemoEnvironment             // Apply your combined 3 conditions here
+@ConditionalOnDemoEnvironment             // Apply your combined conditions here
 public class PaymentController {
 
     private final PaymentService paymentService;
