@@ -262,6 +262,28 @@ public class RequestLogCollector {
     public static final String LOG_RESPONSE = "response";
 
     /**
+     * Inner-key written when a RestTemplate call is skipped by the URL skip list
+     * ({@code api.request.logging.rest-template.skip.urls}).
+     *
+     * <p>The value is recorded under the timestamped outer-map key so it appears
+     * in the structured log block alongside other RestTemplate calls, making it
+     * visible that the URL was reached but intentionally not logged:</p>
+     *
+     * <pre>
+     * ── https://auth-server/oauth/token [14:32:05.001]
+     *    skipped: request/response logging skipped — URL matched skip list
+     * </pre>
+     *
+     * <p>The HTTP call is still executed normally — only the logging is suppressed.
+     * This is the correct behaviour for credential-bearing endpoints such as
+     * OAuth2 token URLs where request/response bodies must never appear in logs.</p>
+     *
+     * @see com.github.yash777.apirequestlogging.resttemplate.RestTemplateLoggingInterceptor
+     * @see com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties.RestTemplateProperties.SkipProperties
+     */
+    public static final String LOG_SKIPPED = "skipped";
+    
+    /**
      * Standard inner-key for an exception thrown during a third-party call.
      *
      * <p>When this key is used, {@link #addLog(String, String, Object)} detects

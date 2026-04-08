@@ -1,15 +1,19 @@
 package com.github.yash777.apirequestlogging.autoconfigure;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.filter.OrderedRequestContextFilter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.filter.RequestContextFilter;
+
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
 import com.github.yash777.apirequestlogging.filter.ApiLoggingFilter;
 import com.github.yash777.apirequestlogging.filter.RequestBodyCachingFilter;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
-
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * <h2>ApiRequestLoggingAutoConfiguration</h2>
@@ -87,4 +91,21 @@ public class ApiRequestLoggingAutoConfiguration {
      *   4. @ConditionalOnWebApplication — ensures we only activate in a web context
      *   5. @ConditionalOnProperty — master on/off switch
      */
+	
+    /**
+     * Ensures OrderedRequestContextFilter is registered at order -105
+     * before our filters run at -104 / -103.
+     *
+     * Spring Boot auto-configures this in standard setups, but some
+     * consumer applications (WAR deployments, custom servlet configs)
+     * do not have it. @ConditionalOnMissingBean prevents duplication
+     * when it is already registered.
+     */
+    @Bean
+    @ConditionalOnMissingBean(RequestContextFilter.class)
+    public OrderedRequestContextFilter starterRequestContextFilter() {
+        OrderedRequestContextFilter filter = new OrderedRequestContextFilter();
+        filter.setOrder(-105);
+        return filter;
+    }
 }

@@ -351,24 +351,41 @@ public class ApiRequestLoggingProperties {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    //  NESTED — RestTemplate
+    //  NESTED — RestTemplateProperties
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * Settings for automatic RestTemplate call capture.
+     * Settings for automatic {@link org.springframework.web.client.RestTemplate}
+     * call capture.
      *
      * <p>When {@link #isAutoCaptureEnabled()} is {@code true}, a
      * {@code BeanPostProcessor} injects a logging interceptor into every
      * {@code RestTemplate} bean registered in the Spring context.</p>
+     * 
+     * <h3>Quick setup</h3>
+     * <pre>
+     * # Enable auto-injection of the logging interceptor
+     * api.request.logging.rest-template.auto-capture-enabled=true
+     *
+     * # Skip credential-bearing endpoints (ends-with mode — host-agnostic)
+     * api.request.logging.rest-template.skip.urls=/platform/oauth/oauth2/token,/internal/health
+     * api.request.logging.rest-template.skip.urls-match-endswith=true
+     *
+     * # OR skip by full URL (exact equality)
+     * api.request.logging.rest-template.skip.urls=http://localhost:8080/platform/oauth/oauth2/token
+     * api.request.logging.rest-template.skip.urls-match-full=true
+     * </pre>
      *
      * <p><strong>Limitation:</strong> only Spring-managed {@code RestTemplate}
      * beans are intercepted. Instances created with {@code new RestTemplate()}
      * inside a method body are invisible to Spring and cannot be auto-captured.</p>
      */
     public static class RestTemplateProperties {
+
         /**
-         * Auto-inject a logging interceptor into all RestTemplate beans.
-         * Default: {@code false}.
+         * Auto-inject a logging interceptor into all Spring-managed
+         * {@link org.springframework.web.client.RestTemplate} beans.
+         * Default: {@code false} — opt-in to preserve v1.0.x behaviour.
          */
         private boolean autoCaptureEnabled = false;
 
@@ -379,11 +396,20 @@ public class ApiRequestLoggingProperties {
         private boolean logResponseBody = true;
 
         /**
-         * Max characters for RestTemplate bodies. {@code -1} = unlimited.
-         * Default: {@code 4096}.
+         * Maximum characters stored from RestTemplate request/response bodies.
+         * Set to {@code -1} for unlimited. Default: {@code 4096}.
          */
         private int maxBodyLength = 4096;
 
+        /**
+         * URL skip configuration — endpoints that should never be logged
+         * (e.g. OAuth2 token URLs whose bodies contain credentials).
+         */
+        @org.springframework.boot.context.properties.NestedConfigurationProperty
+        private SkipProperties skip = new SkipProperties();
+        
+        // ── Getters / Setters ─────────────────────────────────────────
+        
         public boolean isAutoCaptureEnabled()            { return autoCaptureEnabled; }
         public void setAutoCaptureEnabled(boolean v)     { this.autoCaptureEnabled = v; }
         public boolean isLogRequestBody()                { return logRequestBody; }
@@ -392,8 +418,110 @@ public class ApiRequestLoggingProperties {
         public void setLogResponseBody(boolean v)        { this.logResponseBody = v; }
         public int getMaxBodyLength()                    { return maxBodyLength; }
         public void setMaxBodyLength(int v)              { this.maxBodyLength = v; }
-    }
+        public SkipProperties getSkip()                  { return skip; }
+        public void setSkip(SkipProperties v)            { this.skip = v; }
 
+        // ── Nested: SkipProperties ────────────────────────────────────
+
+        /**
+         * URL skip rules for {@link com.github.yash777.apirequestlogging.resttemplate.RestTemplateLoggingInterceptor}.
+         *
+         * <h3>ends-with mode (host-agnostic)</h3>
+         * <p>Use a URL path suffix so the same pattern matches any host:</p>
+         * <pre>
+         * api.request.logging.rest-template.skip.urls=/platform/oauth/oauth2/token
+         * api.request.logging.rest-template.skip.urls-match-endswith=true
+         * </pre>
+         * <p>Matches:
+         * {@code http://localhost:8080/platform/oauth/oauth2/token} ✅<br>
+         * {@code https://prod.example.com/platform/oauth/oauth2/token} ✅</p>
+         *
+         * <h3>full URL mode (exact equality)</h3>
+         * <pre>
+         * api.request.logging.rest-template.skip.urls=http://localhost:8080/platform/oauth/oauth2/token
+         * api.request.logging.rest-template.skip.urls-match-full=true
+         * </pre>
+         * <p>Matches only the exact URL including scheme, host, port, and path.</p>
+         *
+         * <h3>Both modes together</h3>
+         * <p>Both flags can be {@code true} simultaneously — a URL is skipped
+         * when <em>either</em> condition matches.</p>
+         *
+         * <h3>Multiple URLs</h3>
+         * <pre>
+         * api.request.logging.rest-template.skip.urls=\
+         *     /platform/oauth/oauth2/token,\
+         *     /internal/health,\
+         *     /actuator/info
+         * </pre>
+         */
+        public static class SkipProperties {
+
+            /**
+             * Comma-separated list of URL patterns to skip.
+             *
+             * <p>Each entry is matched against the full request URL using the
+             * mode(s) selected by {@link #isUrlsMatchEndswith()} and/or
+             * {@link #isUrlsMatchFull()}.  Entries may be path suffixes
+             * (for ends-with mode) or full URLs (for full-match mode).</p>
+             *
+             * <p>Default: empty — no URLs are skipped.</p>
+             *
+             * <pre>
+             * # Path-suffix entries (use with urls-match-endswith=true):
+             * api.request.logging.rest-template.skip.urls=\
+             *     /platform/oauth/oauth2/token,/internal/health
+             *
+             * # Full URL entries (use with urls-match-full=true):
+             * api.request.logging.rest-template.skip.urls=\
+             *     http://localhost:8080/platform/oauth/oauth2/token
+             * </pre>
+             */
+            private java.util.List<String> urls = java.util.Collections.emptyList();
+
+            /**
+             * When {@code true}, a URL is skipped if the full request URL
+             * <em>ends with</em> any entry in {@link #getUrls()}.
+             *
+             * <p>This is the recommended mode when the skip list contains path
+             * suffixes — the match is host-agnostic, so the same pattern works
+             * in local dev, staging, and production without changing the property.</p>
+             *
+             * <p>Default: {@code false}.</p>
+             *
+             * <pre>
+             * api.request.logging.rest-template.skip.urls-match-endswith=true
+             * </pre>
+             */
+            private boolean urlsMatchEndswith = false;
+
+            /**
+             * When {@code true}, a URL is skipped if the full request URL
+             * <em>equals</em> any entry in {@link #getUrls()} (case-sensitive,
+             * query-string inclusive).
+             *
+             * <p>Use this mode when you need to skip an exact URL and want to
+             * be sure that similar paths on different hosts are not skipped.</p>
+             *
+             * <p>Default: {@code false}.</p>
+             *
+             * <pre>
+             * api.request.logging.rest-template.skip.urls-match-full=true
+             * </pre>
+             */
+            private boolean urlsMatchFull = false;
+
+            // ── Getters / Setters ─────────────────────────────────────
+
+            public java.util.List<String> getUrls()          { return urls; }
+            public void setUrls(java.util.List<String> v)    { this.urls = v; }
+            public boolean isUrlsMatchEndswith()              { return urlsMatchEndswith; }
+            public void setUrlsMatchEndswith(boolean v)       { this.urlsMatchEndswith = v; }
+            public boolean isUrlsMatchFull()                  { return urlsMatchFull; }
+            public void setUrlsMatchFull(boolean v)           { this.urlsMatchFull = v; }
+        }
+    }
+    
     // ══════════════════════════════════════════════════════════════════
     //  NESTED — Logger
     // ══════════════════════════════════════════════════════════════════
