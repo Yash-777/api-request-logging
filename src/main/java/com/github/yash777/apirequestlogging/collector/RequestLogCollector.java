@@ -237,29 +237,55 @@ public class RequestLogCollector {
     public static final String LOG_REQUEST = "request";
 
     /**
-     * Standard inner-key for the incoming response payload of a third-party call.
+     * Inner-key for the outgoing response body on successful (2xx/3xx) requests.
      *
-     * <p>Use this constant as the {@code innerKey} in
-     * {@link #addLog(String, String, Object)} to record what was received.
-     * Pass {@code null} if the call threw before a response was received —
-     * {@link #addLog} stores {@code null} values and {@link #printLogs()}
-     * prints {@code "null"} so the absence of a response is explicit:</p>
-     * <pre>{@code
-     * PaymentResponse res = null;
-     * try {
-     *     res = gateway.post(request);
-     * } finally {
-     *     collector.addLog(key, RequestLogCollector.LOG_RESPONSE, res); // null-safe
-     * }
-     * }</pre>
-     * <p>Produces the log line:</p>
+     * <p>Written to the {@link #INCOMING_KEY} block after the filter chain
+     * completes and the {@link org.springframework.web.util.ContentCachingResponseWrapper}
+     * buffer has been read — before {@code copyBodyToResponse()} flushes it to
+     * the socket.</p>
+     *
+     * <h3>Log output</h3>
      * <pre>
-     *    response:  {"txnId":"TXN-99","status":"SUCCESS"}
-     *    // or on failure:
-     *    response:  null
+     * ── INCOMING
+     *    responseStatus:  200
+     *    response:        {"orderId":"ORD-001","status":"CONFIRMED"}
      * </pre>
+     *
+     * <p>Populated only when
+     * {@link com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties#isLogResponseBody()}
+     * is {@code true} (the default).</p>
+     *
+     * @see com.github.yash777.apirequestlogging.util.RequestResponseCaptureUtil#captureResponseBody
      */
     public static final String LOG_RESPONSE = "response";
+
+    /**
+     * Inner-key for the HTTP error message captured when a filter or exception
+     * handler short-circuits the request with a non-2xx status.
+     *
+     * <p>Written to the {@link #INCOMING_KEY} block in two situations:</p>
+     * <ol>
+     *   <li>A consumer filter called {@code response.sendError(status, message)}
+     *       and returned early — the chain was never invoked.</li>
+     *   <li>The chain ran but the controller / {@code @ExceptionHandler} returned
+     *       a 4xx or 5xx response without a body (e.g. {@code 401 Unauthorized}
+     *       from a security filter).</li>
+     * </ol>
+     *
+     * <h3>Log output</h3>
+     * <pre>
+     * ── INCOMING
+     *    responseStatus:  401
+     *    responseError:   Language is Required
+     * </pre>
+     *
+     * <p>When the error response <em>does</em> have a body (e.g. a JSON error
+     * document from {@code @ExceptionHandler}), {@code "responseBody"} is used
+     * instead and this key is omitted.</p>
+     *
+     * @see com.github.yash777.apirequestlogging.util.RequestResponseCaptureUtil#captureResponseBody
+     */
+    public static final String LOG_RESPONSE_ERROR = "responseError";
 
     /**
      * Inner-key written when a RestTemplate call is skipped by the URL skip list
@@ -449,9 +475,10 @@ public class RequestLogCollector {
         // ── Log all fields ────────────────────────────────────────────────
         addLog(INCOMING_KEY, "requestId",  this.requestId);
         addLog(INCOMING_KEY, "threadName", Thread.currentThread().getName());
-        addLog(INCOMING_KEY, "url",        request.getRequestURI());
-        addLog(INCOMING_KEY, "httpMethod", request.getMethod());
         addLog(INCOMING_KEY, "timestamp",  TimestampUtils.getCurrentTimestamp());
+        String paths = " ➤ ContextPath["+request.getContextPath()+"] — ServletPath["+request.getServletPath()+"]";
+        addLog(INCOMING_KEY, "url",        request.getRequestURI() + paths);
+        addLog(INCOMING_KEY, "httpMethod", request.getMethod());
 
         if (properties.isLogHeaders()) {
             addLog(INCOMING_KEY, "headers", headersAsJson(request));

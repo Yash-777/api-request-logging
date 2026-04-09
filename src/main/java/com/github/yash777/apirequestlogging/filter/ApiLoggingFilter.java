@@ -2,6 +2,7 @@ package com.github.yash777.apirequestlogging.filter;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
+import com.github.yash777.apirequestlogging.util.RequestResponseCaptureUtil;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -17,7 +18,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -231,6 +231,11 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
         StopWatch sw = new StopWatch("ApiLoggingFilter");
         sw.start("request-processing");
 
+        // Track whether chain.doFilter() was actually called.
+        // When a consumer filter short-circuits (sendError + return),
+        // chainInvoked stays false — we still flush what we can in finally.
+        boolean chainInvoked = false;
+        
         try {
             // ── STEP 3: Delegate to the rest of the chain ─────────────────
             // Blocks until the controller returns (or throws).
@@ -238,6 +243,7 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
             // real instance via the proxy (same thread = same RequestAttributes).
             chain.doFilter(request, response);
 
+            chainInvoked = true;
         } finally {
 
             // ── STEP 4: Stop timing ───────────────────────────────────────
@@ -245,44 +251,42 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
             // controller throws a RuntimeException or Error.
             sw.stop();
 
-            // ── STEP 5: Capture request body (conditional) ───────────────
-            // ContentCachingRequestWrapper buffers bytes only AFTER the
-            // downstream (Jackson / controller) has read the InputStream.
-            // Reading here guarantees the buffer is fully populated.
-            if (properties.isLogRequestBody()
-                    && request instanceof ContentCachingRequestWrapper) {
-                byte[] reqBytes =
-                        ((ContentCachingRequestWrapper) request).getContentAsByteArray();
-                if (reqBytes.length > 0) {
-                    String body = new String(reqBytes, StandardCharsets.UTF_8);
-                    collector.addLog(RequestLogCollector.INCOMING_KEY, "requestBody",
-                            truncate(body));
-                }
+            int responseStatus = response.getStatus();
+            
+            // ── STEP 5: Request body type + body ──────────────────────────
+            if (properties.isLogRequestBody()) {
+                RequestResponseCaptureUtil.logRequestBodyType(request, collector);
+                RequestResponseCaptureUtil.captureRequestBody(
+                        request, chainInvoked, responseStatus, collector, properties);
             }
 
-            // ── STEP 6: Capture response status + body (conditional) ──────
-            // Read BEFORE RequestBodyCachingFilter's finally calls
-            // copyBodyToResponse() — that call flushes and clears the buffer.
+            // ── STEP 6: Redirect path (3xx only — no-op for all other responses) ──
+            // Reads the Location response header; logs "redirectPath" when present.
+            RequestResponseCaptureUtil.captureRedirectPath(response, collector);
+            
+            // ── STEP 7: Response status + body / error ────────────────────
+            // Read BEFORE RequestBodyCachingFilter's finally calls copyBodyToResponse()
+            // — that flushes and clears the buffer.
             // Finally-block unwind order:
-            //   this filter (order -103)  unwinds FIRST  → reads cached bytes
+            //   this filter (-103) unwinds FIRST  → reads cached bytes here
             //   RequestBodyCachingFilter (-104) unwinds AFTER → flushes to socket
             if (response instanceof ContentCachingResponseWrapper) {
                 ContentCachingResponseWrapper cr =
                         (ContentCachingResponseWrapper) response;
                 collector.addLog(RequestLogCollector.INCOMING_KEY,
-                        "responseStatus", String.valueOf(response.getStatus()));
-
+                        "responseStatus", String.valueOf(responseStatus));
+ 
                 if (properties.isLogResponseBody()) {
-                    byte[] resBytes = cr.getContentAsByteArray();
-                    String body = resBytes.length > 0
-                            ? new String(resBytes, StandardCharsets.UTF_8)
-                            : "(empty)";
-                    collector.addLog(RequestLogCollector.INCOMING_KEY,
-                            "responseBody", truncate(body));
+                    RequestResponseCaptureUtil.captureResponseBody(
+                            cr, request, responseStatus, chainInvoked, collector, properties);
                 }
+            } else {
+                // Response not wrapped (edge case) — still record the status
+                collector.addLog(RequestLogCollector.INCOMING_KEY,
+                        "responseStatus", String.valueOf(responseStatus));
             }
 
-            // ── STEP 7: Store formatted elapsed time ──────────────────────
+            // ── STEP 8: Store formatted elapsed time ──────────────────────
             //
             // sw.getTotalTimeMillis() — returns elapsed milliseconds.
             // Available since Spring Framework 4.0; safe for Spring Boot 2.5+.
@@ -297,9 +301,10 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
             collector.addLog(RequestLogCollector.INCOMING_KEY,
                     "requestProcessedTime", formatElapsed(totalMillis));
 
-            // ── STEP 8: Print ─────────────────────────────────────────────
+            // ── STEP 9: Print/Flush ────────────────────────────────────
             // All fields are now present.  One coherent chronological block.
             collector.printLogs();
+            
         }
     }
 
@@ -339,23 +344,6 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
         // String.format — not String.formatted() (Java 15+) — for Java 8 compat.
         return String.format("%dh %dm %ds %dms", hours, minutes, seconds, millis);
     }
-
-    /**
-     * Truncates {@code body} to {@link ApiRequestLoggingProperties#getMaxBodyLength()}
-     * characters and appends a {@code [TRUNCATED at N chars]} suffix when cut.
-     *
-     * <p>Returns the original string unchanged when {@code maxBodyLength}
-     * is {@code -1} (unlimited) or the body is shorter than the limit.</p>
-     *
-     * @param body the raw body string
-     * @return body, possibly truncated
-     */
-    private String truncate(String body) {
-        int max = properties.getMaxBodyLength();
-        if (max < 0 || body == null || body.length() <= max) return body;
-        return body.substring(0, max) + " [TRUNCATED at " + max + " chars]";
-    }
-
 
     // ═════════════════════════════════════════════════════════════════════
     //  INNER CLASS — filter registration and order
