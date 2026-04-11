@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -212,6 +213,29 @@ public class ApiRequestLoggingProperties {
      * <pre>api.request.logging.log-headers=true</pre>
      */
     private boolean logHeaders = true;
+    
+    /**
+     * Comma-separated list of header names to omit entirely from the log.
+     *
+     * <p>Matching is case-insensitive.  Headers in this list are dropped before
+     * the log entry is built — they never appear in the output, not even as
+     * masked values.  Use this for noisy headers that add no diagnostic value
+     * (e.g. {@code user-agent}, {@code postman-token}, {@code cache-control}).</p>
+     *
+     * <p>Default: empty — all headers are logged (subject to masking rules).</p>
+     *
+     * <pre>
+     * api.request.logging.skip-headers=user-agent,postman-token,cache-control,postman-token,accept-encoding
+     * </pre>
+     *
+     * <p>Difference from {@code mask.fields}:</p>
+     * <table border="1" cellpadding="4">
+     *   <tr><th>Property</th><th>Effect</th><th>Header appears in log?</th></tr>
+     *   <tr><td>{@code skip-headers}</td><td>header dropped entirely</td><td>No</td></tr>
+     *   <tr><td>{@code mask.fields}</td><td>value replaced with {@code ***MASKED***}</td><td>Yes (masked)</td></tr>
+     * </table>
+     */
+    private List<String> skipHeaders = Collections.emptyList();
 
     // ── Body truncation ───────────────────────────────────────────────────
 
@@ -288,6 +312,9 @@ public class ApiRequestLoggingProperties {
         this.logHeaders = logHeaders;
     }
 
+    public List<String> getSkipHeaders()              { return skipHeaders; }
+    public void setSkipHeaders(List<String> v)        { this.skipHeaders = v; }
+    
     /** @return maximum body characters stored before truncation */
     public int getMaxBodyLength() { return maxBodyLength; }
 

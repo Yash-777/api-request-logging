@@ -809,37 +809,101 @@ public class RequestLogCollector {
         return s == null || s.trim().isEmpty();
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  REQUEST HEADERS CAPTURE
+    // ══════════════════════════════════════════════════════════════════
     /**
      * Serialises all non-blank request headers to a compact JSON object,
-     * applying secret masking to header values when masking is enabled.
+     * applying two independent filters before the value is written:
      *
-     * <p>Headers with null or blank values are silently excluded.
-     * Output example:</p>
-     * <pre>{"content-type":"application/json","host":"localhost:8080","x-request-id":"abc-123"}</pre>
+     * <ol>
+     *   <li><strong>Skip list</strong> ({@code api.request.logging.skip-headers}) —
+     *       headers whose name appears in this list are dropped entirely.
+     *       They do not appear in the output even as masked values.
+     *       Matching is case-insensitive.</li>
+     *   <li><strong>Mask list</strong> ({@code api.request.logging.mask.fields}) —
+     *       headers whose name appears in this list have their value replaced with
+     *       {@link ApiRequestLoggingProperties.MaskProperties#getReplacement()}
+     *       (default {@code ***MASKED***}).  The header name is still logged.</li>
+     * </ol>
      *
-     * @param request the current {@link HttpServletRequest}
-     * @return JSON object string, or {@code "{}"} on failure
+     * <h3>Processing order</h3>
+     * <pre>
+     * for each header name:
+     *   1. skip?  → drop entirely          (skip-headers list)
+     *   2. mask?  → replace value          (mask.fields list, when masking enabled)
+     *   3. else   → log name + value as-is
+     * </pre>
+     *
+     * <h3>Example</h3>
+     * <p>Given headers: {@code content-type, user-agent, authorization, host}
+     * with {@code skip-headers=user-agent} and {@code mask.fields=authorization}:</p>
+     * <pre>
+     * {"content-type":"application/json","authorization":"***MASKED***","host":"localhost:8080"}
+     * </pre>
+     * <p>{@code user-agent} is absent entirely; {@code authorization} is present
+     * but its value is hidden.</p>
+     *
+     * @param request the current {@link HttpServletRequest}; safe to pass {@code null}
+     * @return compact JSON object string, or {@code "{}"} when request is null or
+     *         on serialisation failure
      */
     private String headersAsJson(HttpServletRequest request) {
         if (request == null) return "{}";
+
+        ApiRequestLoggingProperties.MaskProperties maskProps = properties.getMask();
+        List<String> skipHeaders = properties.getSkipHeaders();   // never null — default emptyList()
+
         Map<String, String> map = new LinkedHashMap<>();
         Enumeration<String> names = request.getHeaderNames();
         if (names != null) {
-        	ApiRequestLoggingProperties.MaskProperties maskProps = properties.getMask();
             for (String name : Collections.list(names)) {
+
+                // ── Filter 1: skip-headers — drop entirely ────────────────
+                if (isSkippedHeader(name, skipHeaders)) {
+                    continue;
+                }
+
                 String value = request.getHeader(name);
-                if (!isBlank(value)) {
-                    if (maskProps.isEnabled()
-                            && SecretMaskingUtil.shouldMaskHeader(name, maskProps.getFields())) {
-                         map.put(name, maskProps.getReplacement());
-                    } else {
-                        map.put(name, value.trim());
-                    }
+                if (isBlank(value)) {
+                    continue;   // never log blank values
+                }
+
+                // ── Filter 2: mask — replace value ────────────────────────
+                if (maskProps.isEnabled()
+                        && SecretMaskingUtil.shouldMaskHeader(name, maskProps.getFields())) {
+                    map.put(name, maskProps.getReplacement());
+                } else {
+                    map.put(name, value.trim());
                 }
             }
         }
+
         try   { return MAPPER.writeValueAsString(map); }
         catch (Exception e) { return "{}"; }
+    }
+
+    /**
+     * Returns {@code true} when {@code headerName} should be omitted from the log
+     * because it appears in the configured skip list.
+     *
+     * <p>Matching is case-insensitive: {@code "User-Agent"}, {@code "user-agent"},
+     * and {@code "USER-AGENT"} all match a skip entry of {@code "user-agent"}.</p>
+     *
+     * @param headerName  the header name to check; may be {@code null}
+     * @param skipHeaders the configured skip list; may be {@code null} or empty
+     * @return {@code true} if the header should be dropped from the log
+     */
+    private static boolean isSkippedHeader(String headerName, List<String> skipHeaders) {
+        if (headerName == null || skipHeaders == null || skipHeaders.isEmpty()) {
+            return false;
+        }
+        for (String skip : skipHeaders) {
+            if (skip.equalsIgnoreCase(headerName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
