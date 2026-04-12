@@ -2,13 +2,10 @@ package com.github.yash777.apirequestlogging.demo.controller;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
 import com.github.yash777.apirequestlogging.demo.condition.ConditionalOnDemoEnvironment;
-import com.github.yash777.apirequestlogging.demo.config.DemoConfiguration;
 import com.github.yash777.apirequestlogging.demo.service.OrderService;
+import com.github.yash777.apirequestlogging.demo.service.WeatherService;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -71,7 +68,7 @@ public class OrderController {
     }
 
     @Autowired
-    private DemoConfiguration demoConfiguration;
+    private WeatherService weatherService;
     
     /**
      * Creates a new order by running the full
@@ -90,7 +87,7 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@RequestBody OrderRequest request) {
         OrderResponse response = orderService.createOrder(request);
-        demoConfiguration.getWeather();
+        weatherService.getWeather();
         return ResponseEntity.ok(response);
     }
 
