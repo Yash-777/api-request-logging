@@ -3,6 +3,8 @@ package com.github.yash777.apirequestlogging.demo;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import com.github.yash777.apirequestlogging.demo.diagnostic.StartupDiagnosticUtil;
+
 /**
  * <h2>DemoApplication — Live Demo entry point</h2>
  *
@@ -157,6 +159,7 @@ public class DemoApplication {
         // activate demo beans regardless of their properties configuration.
         nonConsumer = true;
 
+        StartupDiagnosticUtil.print(args);
         SpringApplication.run(DemoApplication.class, args);
     }
 }
