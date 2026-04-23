@@ -1,5 +1,7 @@
 package com.github.yash777.apirequestlogging.demo;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -78,6 +80,26 @@ import com.github.yash777.apirequestlogging.demo.diagnostic.StartupDiagnosticUti
 @SpringBootApplication
 public class DemoApplication {
 
+	/**
+	 * Guards {@link StartupDiagnosticUtil#print(String[])} against double execution.
+	 *
+	 * <p><b>Problem:</b> DevTools calls {@code main()} twice on first launch —
+	 * once from the base JVM classloader, then immediately from
+	 * {@code RestartClassLoader} — producing two identical banners:
+	 * <pre>
+	 * ╔══ STARTUP DIAGNOSTIC REPORT ══╗  ← base classloader (unwanted)
+	 * ╔══ STARTUP DIAGNOSTIC REPORT ══╗  ← RestartClassLoader (wanted)
+	 * </pre>
+	 *
+	 * <p><b>Solution:</b> {@link java.util.concurrent.atomic.AtomicBoolean#compareAndSet}
+	 * allows only the first {@code main()} invocation to print; all subsequent
+	 * calls (DevTools restarts) are silently skipped:
+	 * <pre>
+	 * ╔══ STARTUP DIAGNOSTIC REPORT ══╗  ← printed once ✅
+	 * </pre>
+	 */
+	private static final AtomicBoolean DIAGNOSTIC_PRINTED = new AtomicBoolean(false);
+    
     /**
      * Static flag that distinguishes the demo JVM process from any consumer
      * application that has this starter on its classpath.
@@ -159,7 +181,20 @@ public class DemoApplication {
         // activate demo beans regardless of their properties configuration.
         nonConsumer = true;
 
-        StartupDiagnosticUtil.print(args);
+        /*
+         * Print StartupDiagnosticUtil banner only once on DevTools startup
+         * 
+         * DevTools calls main() twice on first launch — base JVM classloader then
+         * RestartClassLoader — causing the diagnostic banner to appear twice.
+         * Subsequent restarts (live-reload) correctly print it once.
+         * 
+         * Added AtomicBoolean guard: compareAndSet(false, true) allows only the
+         * first main() invocation to print; all subsequent calls are skipped.
+         */
+        if (DIAGNOSTIC_PRINTED.compareAndSet(false, true)) {
+            StartupDiagnosticUtil.print(args);
+        }
+        
         SpringApplication.run(DemoApplication.class, args);
     }
 }
