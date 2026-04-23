@@ -1,12 +1,10 @@
 package com.github.yash777.apirequestlogging.demo.service;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.demo.condition.ConditionalOnDemoEnvironment;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -59,7 +57,7 @@ public class PaymentService {
      * CGLIB proxy of the request-scoped {@link RequestLogCollector}.
      * Safe to hold in a singleton — proxy resolves the real bean per-thread.
      */
-    private final RequestLogCollector collector;
+    private final RequestLogCollectorApi collector;
 
     /**
      * Constructor injection — makes the dependency explicit and {@code final}.
@@ -67,7 +65,7 @@ public class PaymentService {
      * @param collector CGLIB proxy of {@link RequestLogCollector}
      */
     @Autowired
-    public PaymentService(RequestLogCollector collector) {
+    public PaymentService(RequestLogCollectorApi collector) {
         this.collector = collector;
     }
 

@@ -1,6 +1,7 @@
 package com.github.yash777.apirequestlogging.aop;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
 
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -54,10 +55,10 @@ import org.springframework.stereotype.Component;
 )
 public class ControllerHandlerAspect {
 
-    private final RequestLogCollector collector;
+    private final RequestLogCollectorApi collector;
     private final ApiRequestLoggingProperties properties;
 
-    public ControllerHandlerAspect(RequestLogCollector collector,
+    public ControllerHandlerAspect(RequestLogCollectorApi      collector,
                                    ApiRequestLoggingProperties properties) {
         this.collector  = collector;
         this.properties = properties;

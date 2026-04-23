@@ -151,14 +151,14 @@ import java.util.UUID;
 @Component
 @Scope(
     value     = WebApplicationContext.SCOPE_REQUEST,
-    proxyMode = ScopedProxyMode.TARGET_CLASS   // mandatory — lets singletons hold a proxy reference
+    proxyMode = ScopedProxyMode.INTERFACES   // mandatory — lets singletons hold a proxy reference ← was TARGET_CLASS
 )
 @ConditionalOnProperty(
     prefix = "api.request.logging",
     name   = "enabled",
     havingValue = "true"
 )
-public class RequestLogCollector {
+public class RequestLogCollector implements RequestLogCollectorApi {
 
     // ── Shared, thread-safe static infrastructure ─────────────────────────
     //
@@ -214,161 +214,6 @@ public class RequestLogCollector {
         return CURRENT_REQUEST_ID.get();
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  INNER-KEY CONSTANTS
-    //  Use these constants as the innerKey argument to addLog() for the three
-    //  standard fields in every third-party call entry.  Using constants
-    //  prevents typos and makes grepping logs reliable.
-    // ═════════════════════════════════════════════════════════════════════
-
-    /**
-     * Standard inner-key for the outgoing request payload of a third-party call.
-     *
-     * <p>Use this constant as the {@code innerKey} in
-     * {@link #addLog(String, String, Object)} to record what was sent:</p>
-     * <pre>{@code
-     * collector.addLog(key, RequestLogCollector.LOG_REQUEST, paymentRequest);
-     * }</pre>
-     * <p>Produces the log line:</p>
-     * <pre>
-     *    request:  {"orderId":"ORD-1","amount":500.0}
-     * </pre>
-     */
-    public static final String LOG_REQUEST = "request";
-
-    /**
-     * Inner-key for the outgoing response body on successful (2xx/3xx) requests.
-     *
-     * <p>Written to the {@link #INCOMING_KEY} block after the filter chain
-     * completes and the {@link org.springframework.web.util.ContentCachingResponseWrapper}
-     * buffer has been read — before {@code copyBodyToResponse()} flushes it to
-     * the socket.</p>
-     *
-     * <h3>Log output</h3>
-     * <pre>
-     * ── INCOMING
-     *    responseStatus:  200
-     *    response:        {"orderId":"ORD-001","status":"CONFIRMED"}
-     * </pre>
-     *
-     * <p>Populated only when
-     * {@link com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties#isLogResponseBody()}
-     * is {@code true} (the default).</p>
-     *
-     * @see com.github.yash777.apirequestlogging.util.RequestResponseCaptureUtil#captureResponseBody
-     */
-    public static final String LOG_RESPONSE = "response";
-
-    /**
-     * Inner-key for the HTTP error message captured when a filter or exception
-     * handler short-circuits the request with a non-2xx status.
-     *
-     * <p>Written to the {@link #INCOMING_KEY} block in two situations:</p>
-     * <ol>
-     *   <li>A consumer filter called {@code response.sendError(status, message)}
-     *       and returned early — the chain was never invoked.</li>
-     *   <li>The chain ran but the controller / {@code @ExceptionHandler} returned
-     *       a 4xx or 5xx response without a body (e.g. {@code 401 Unauthorized}
-     *       from a security filter).</li>
-     * </ol>
-     *
-     * <h3>Log output</h3>
-     * <pre>
-     * ── INCOMING
-     *    responseStatus:  401
-     *    responseError:   Language is Required
-     * </pre>
-     *
-     * <p>When the error response <em>does</em> have a body (e.g. a JSON error
-     * document from {@code @ExceptionHandler}), {@code "responseBody"} is used
-     * instead and this key is omitted.</p>
-     *
-     * @see com.github.yash777.apirequestlogging.util.RequestResponseCaptureUtil#captureResponseBody
-     */
-    public static final String LOG_RESPONSE_ERROR = "responseError";
-
-    /**
-     * Inner-key written when a RestTemplate call is skipped by the URL skip list
-     * ({@code api.request.logging.rest-template.skip.urls}).
-     *
-     * <p>The value is recorded under the timestamped outer-map key so it appears
-     * in the structured log block alongside other RestTemplate calls, making it
-     * visible that the URL was reached but intentionally not logged:</p>
-     *
-     * <pre>
-     * ── https://auth-server/oauth/token [14:32:05.001]
-     *    skipped: request/response logging skipped — URL matched skip list
-     * </pre>
-     *
-     * <p>The HTTP call is still executed normally — only the logging is suppressed.
-     * This is the correct behaviour for credential-bearing endpoints such as
-     * OAuth2 token URLs where request/response bodies must never appear in logs.</p>
-     *
-     * @see com.github.yash777.apirequestlogging.resttemplate.RestTemplateLoggingInterceptor
-     * @see com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties.RestTemplateProperties.SkipProperties
-     */
-    public static final String LOG_SKIPPED = "skipped";
-    
-    /**
-     * Standard inner-key for an exception thrown during a third-party call.
-     *
-     * <p>When this key is used, {@link #addLog(String, String, Object)} detects
-     * that the value is a {@link Throwable} and automatically formats the stack
-     * trace — keeping only the first {@value #EXCEPTION_MAX_LINES} lines to
-     * avoid flooding the log.  Always use inside a {@code catch} block:</p>
-     * <pre>{@code
-     * try {
-     *     res = gateway.post(request);
-     * } catch (Exception e) {
-     *     collector.addLog(key, RequestLogCollector.LOG_EXCEPTION, e);
-     * }
-     * }</pre>
-     * <p>Produces the log line (truncated to {@value #EXCEPTION_MAX_LINES} lines):</p>
-     * <pre>
-     *    exception:  java.net.ConnectException: Connection refused
-     *                  at sun.nio.ch.SocketChannelImpl.checkConnect(...)
-     *                  at sun.nio.ch.SocketChannelImpl.finishConnect(...)
-     *                  at org.apache.http.impl.nio.reactor.DefaultConnectingIOReactor...
-     *                  at org.apache.http.impl.nio.reactor.AbstractIOReactor.execute(...)
-     *                  at org.apache.http.impl.nio.reactor.BaseIOReactor.execute(...)
-     *                  ... (truncated to 5 lines)
-     * </pre>
-     *
-     * <p><strong>Note:</strong> the truncation is applied regardless of which
-     * outer {@code key} is used — the trigger is solely the {@code LOG_EXCEPTION}
-     * inner-key value.  You may also pass any other {@link Throwable} subclass
-     * ({@code RuntimeException}, {@code Error}, etc.).</p>
-     */
-    public static final String LOG_EXCEPTION = "exceptionStacktrace";
-
-    // ── Constants ─────────────────────────────────────────────────────────
-
-    /**
-     * Outer-map key used for the main incoming-request entry.
-     * All fields logged by {@link #addRequestMeta(HttpServletRequest)} and by
-     * {@link com.github.yash777.apirequestlogging.filter.ApiLoggingFilter}'s
-     * finally block are stored under this key.
-     */
-    public static final String INCOMING_KEY = "INCOMING";
-
-//    /**
-//     * Inner-key for a caught {@link Throwable}. Stack trace is automatically
-//     * truncated to {@code api.request.logging.exception.max-lines} lines.
-//     */
-//    public static final String LOG_EXCEPTION         = "exceptionStacktrace";
-
-    /**
-     * Inner-key for the short error indicator added to the INCOMING block.
-     * Format: {@code "ERROR:ExceptionSimpleName"}, e.g. {@code "ERROR:NullPointerException"}.
-     */
-    public static final String LOG_ERROR_INDICATOR   = "errorIndicator";
-
-    /**
-     * Inner-key for the AOP-captured controller handler name.
-     * Format: {@code "ControllerClass#methodName"}, e.g. {@code "UserController#listUsers"}.
-     * Written by {@link com.github.yash777.apirequestlogging.aop.ControllerHandlerAspect}.
-     */
-    public static final String LOG_CONTROLLER_HANDLER = "controllerHandler";
     
     // ── Per-instance state ────────────────────────────────────────────────
     //
@@ -501,7 +346,6 @@ public class RequestLogCollector {
     public String getRequestId() {
         return requestId;
     }
-
 
     // ═════════════════════════════════════════════════════════════════════
     //  CORE LOGGING API

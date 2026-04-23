@@ -28,7 +28,7 @@ import java.io.IOException;
  * <h3>Expected log output for any redirect endpoint</h3>
  * <pre>
  * ── INCOMING
- *    url:              /demo/redirect/spring
+ *    url:              /demo/redirect/spring ➤ ContextPath[] — ServletPath[/demo/redirect/spring]
  *    httpMethod:       GET
  *    responseStatus:   302
  *    redirectPath:     /api/payments/status/{txnId}        ← captured from Location header

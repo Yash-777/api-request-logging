@@ -1,6 +1,7 @@
 package com.github.yash777.apirequestlogging.resttemplate;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
 
 import org.slf4j.Logger;
@@ -46,10 +47,10 @@ public class RestTemplateLoggingBeanPostProcessor implements BeanPostProcessor {
     private static final Logger log =
             LoggerFactory.getLogger(RestTemplateLoggingBeanPostProcessor.class);
 
-    private final RequestLogCollector collector;
+    private final RequestLogCollectorApi collector;
     private final ApiRequestLoggingProperties properties;
 
-    public RestTemplateLoggingBeanPostProcessor(RequestLogCollector collector,
+    public RestTemplateLoggingBeanPostProcessor(RequestLogCollectorApi      collector,
                                                 ApiRequestLoggingProperties properties) {
         this.collector  = collector;
         this.properties = properties;

@@ -1,6 +1,7 @@
 package com.github.yash777.apirequestlogging.resttemplate;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
 
 import org.slf4j.Logger;
@@ -79,14 +80,14 @@ public class RestTemplateLoggingInterceptor implements ClientHttpRequestIntercep
     private static final Logger log =
             LoggerFactory.getLogger(RestTemplateLoggingInterceptor.class);
 
-    private final RequestLogCollector         collector;
+    private final RequestLogCollectorApi      collector;
     private final ApiRequestLoggingProperties properties;
 
     /**
      * @param collector  the request-scoped log accumulator (CGLIB proxy — safe in singleton)
      * @param properties externalized starter configuration
      */
-    public RestTemplateLoggingInterceptor(RequestLogCollector         collector,
+    public RestTemplateLoggingInterceptor(RequestLogCollectorApi      collector,
                                           ApiRequestLoggingProperties properties) {
         this.collector  = collector;
         this.properties = properties;

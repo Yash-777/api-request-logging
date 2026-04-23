@@ -10,6 +10,7 @@ import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.filter.ApiLoggingFilter;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
 
@@ -77,7 +78,7 @@ public final class RequestResponseCaptureUtil {
      * @param collector the request-scoped log accumulator
      */
     public static void logRequestBodyType(HttpServletRequest request,
-                                          RequestLogCollector collector) {
+                                          RequestLogCollectorApi collector) {
         String bodyType = detectBodyType(request.getContentType());
         collector.addLog(RequestLogCollector.INCOMING_KEY, "requestBodyType", bodyType);
     }
@@ -160,7 +161,7 @@ public final class RequestResponseCaptureUtil {
     public static void captureRequestBody(HttpServletRequest      request,
                                           boolean                 chainInvoked,
                                           int                     responseStatus,
-                                          RequestLogCollector     collector,
+                                          RequestLogCollectorApi  collector,
                                           ApiRequestLoggingProperties properties) {
         try {
             String bodyType = detectBodyType(request.getContentType());
@@ -277,7 +278,7 @@ public final class RequestResponseCaptureUtil {
                                            HttpServletRequest            request,
                                            int                           status,
                                            boolean                       chainInvoked,
-                                           RequestLogCollector           collector,
+                                           RequestLogCollectorApi        collector,
                                            ApiRequestLoggingProperties   properties) {
         try {
             byte[] resBytes = cr.getContentAsByteArray();
@@ -360,7 +361,7 @@ public final class RequestResponseCaptureUtil {
      * @param collector the request-scoped log accumulator
      */
     public static void captureRedirectPath(HttpServletResponse response,
-                                           RequestLogCollector collector) {
+                                           RequestLogCollectorApi collector) {
         try {
             String location = response.getHeader("Location");
             if (location != null && !location.isEmpty()) {

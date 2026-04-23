@@ -1,6 +1,7 @@
 package com.github.yash777.apirequestlogging.filter;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.properties.ApiRequestLoggingProperties;
 import com.github.yash777.apirequestlogging.util.RequestResponseCaptureUtil;
 
@@ -92,7 +93,7 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
      * {@code RequestContextHolder} on every method call.  The field is
      * {@code final} — written once at construction and never mutated.</p>
      */
-    private final RequestLogCollector collector;
+    private final RequestLogCollectorApi collector;
 
     /** Externalized configuration — drives exclusion lists and body-capture toggles. */
     private final ApiRequestLoggingProperties properties;
@@ -105,7 +106,7 @@ public class ApiLoggingFilter extends OncePerRequestFilter {
      * @param collector  CGLIB proxy of the request-scoped {@link RequestLogCollector}
      * @param properties externalized configuration
      */
-    public ApiLoggingFilter(RequestLogCollector collector,
+    public ApiLoggingFilter(RequestLogCollectorApi collector,
                             ApiRequestLoggingProperties properties) {
         this.collector  = collector;
         this.properties = properties;

@@ -1,14 +1,12 @@
 package com.github.yash777.apirequestlogging.demo.service;
 
 import com.github.yash777.apirequestlogging.collector.RequestLogCollector;
+import com.github.yash777.apirequestlogging.collector.RequestLogCollectorApi;
 import com.github.yash777.apirequestlogging.demo.condition.ConditionalOnDemoEnvironment;
 import com.github.yash777.apirequestlogging.demo.controller.OrderRequest;
 import com.github.yash777.apirequestlogging.demo.controller.OrderResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -32,7 +30,7 @@ import java.util.UUID;
  * ── INCOMING
  *    requestId:            my-id-001
  *    threadName:           http-nio-8080-exec-2
- *    url:                  /api/orders
+ *    url:                  /api/orders ➤ ContextPath[] — ServletPath[/api/orders]
  *    httpMethod:           POST
  *    timestamp:            25/3/2026, 10:32:15 am
  *    headers:              {"content-type":"application/json","x-request-id":"my-id-001"}
@@ -68,7 +66,7 @@ public class OrderService {
      * CGLIB proxy of the request-scoped {@link RequestLogCollector}.
      * Safe to hold in a singleton — the proxy resolves the real bean per thread.
      */
-    private final RequestLogCollector collector;
+    private final RequestLogCollectorApi collector;
 
     /** Payment service — injected to simulate a downstream charge call. */
     private final PaymentService paymentService;
@@ -80,7 +78,7 @@ public class OrderService {
      * @param paymentService downstream payment service
      */
     @Autowired
-    public OrderService(RequestLogCollector collector, PaymentService paymentService) {
+    public OrderService(RequestLogCollectorApi collector, PaymentService paymentService) {
         this.collector      = collector;
         this.paymentService = paymentService;
     }

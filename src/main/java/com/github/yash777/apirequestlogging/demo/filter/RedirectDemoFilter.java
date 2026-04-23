@@ -35,7 +35,7 @@ import java.io.IOException;
  * <h3>Expected log output</h3>
  * <pre>
  * ── INCOMING
- *    url:                  /demo/filter-redirect/login
+ *    url:                  /demo/filter-redirect/login ➤ ContextPath[] — ServletPath[/demo/filter-redirect/login]
  *    httpMethod:           GET
  *    responseStatus:       302
  *    redirectPath:         /login            ← from Location header
