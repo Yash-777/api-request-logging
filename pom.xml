@@ -304,6 +304,28 @@
       <scope>provided</scope>
     </dependency>
 
+    <!-- ── DevTools — demo LiveReload ONLY ───────────────────────────────────
+     scope=provided : NOT packaged into the published starter JAR.
+                      Available on the classpath only when running via
+                      mvn spring-boot:run or IDE run configuration.
+     optional=true  : NOT propagated as a transitive dependency to consumers.
+                      Maven Central will not list this in the published POM's
+                      <dependencies> block at all.
+     DevTools auto-disables itself when running from a packaged JAR (it detects
+     the absence of the RestartClassLoader), so there is zero risk of it
+     accidentally activating in a consumer's production classpath.
+     
+     Is running from mvn spring-boot:run or IDE?
+       └── YES → RestartClassLoader present → DevTools ACTIVE ✅  (your demo)
+       └── NO  → Running from packaged JAR  → DevTools DISABLED automatically 🔒
+     ──────────────────────────────────────────────────────────────────── -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <scope>provided</scope>
+        <optional>true</optional>
+    </dependency>
+    
     <!-- AOP — optional. Activates ControllerHandlerAspect automatically when
             spring-boot-starter-aop is on the consumer's classpath.
             @ConditionalOnClass(ProceedingJoinPoint.class) guards the aspect.
