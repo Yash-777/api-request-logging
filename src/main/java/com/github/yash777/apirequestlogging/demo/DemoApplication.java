@@ -1,7 +1,5 @@
 package com.github.yash777.apirequestlogging.demo;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -80,25 +78,30 @@ import com.github.yash777.apirequestlogging.demo.diagnostic.StartupDiagnosticUti
 @SpringBootApplication
 public class DemoApplication {
 
-	/**
-	 * Guards {@link StartupDiagnosticUtil#print(String[])} against double execution.
-	 *
-	 * <p><b>Problem:</b> DevTools calls {@code main()} twice on first launch —
-	 * once from the base JVM classloader, then immediately from
-	 * {@code RestartClassLoader} — producing two identical banners:
-	 * <pre>
-	 * ╔══ STARTUP DIAGNOSTIC REPORT ══╗  ← base classloader (unwanted)
-	 * ╔══ STARTUP DIAGNOSTIC REPORT ══╗  ← RestartClassLoader (wanted)
-	 * </pre>
-	 *
-	 * <p><b>Solution:</b> {@link java.util.concurrent.atomic.AtomicBoolean#compareAndSet}
-	 * allows only the first {@code main()} invocation to print; all subsequent
-	 * calls (DevTools restarts) are silently skipped:
-	 * <pre>
-	 * ╔══ STARTUP DIAGNOSTIC REPORT ══╗  ← printed once ✅
-	 * </pre>
-	 */
-	private static final AtomicBoolean DIAGNOSTIC_PRINTED = new AtomicBoolean(false);
+    /**
+     * JVM-level guard preventing {@link StartupDiagnosticUtil#print(String[])}
+     * from executing more than once per JVM process.
+     *
+     * <p><b>Why not {@code static AtomicBoolean}?</b>
+     * DevTools' {@code RestartClassLoader} reloads {@code DemoApplication} as a
+     * fresh class on every restart, resetting all {@code static} fields to their
+     * defaults — so an {@code AtomicBoolean} guard is discarded on each reload:
+     * <pre>
+     * JVM start → main() [base loader]      → AtomicBoolean=false → prints ✅
+     *           → main() [RestartClassLoader] → AtomicBoolean=false → prints ❌ (duplicate)
+     * Restart   → main() [RestartClassLoader] → AtomicBoolean=false → prints ❌ (unwanted)
+     * </pre>
+     *
+     * <p><b>Why {@code System.setProperty()}?</b>
+     * {@link System#getProperties()} lives in the JVM process — it is never
+     * cleared by DevTools regardless of how many classloaders are created:
+     * <pre>
+     * JVM start → main() [base loader]      → property absent  → sets + prints ✅
+     *           → main() [RestartClassLoader] → property present → skips ✅
+     * Restart   → main() [RestartClassLoader] → property present → skips ✅
+     * </pre>
+     */
+    private static final String DIAGNOSTIC_PRINTED_KEY = "demo.diagnostic.printed";
     
     /**
      * Static flag that distinguishes the demo JVM process from any consumer
@@ -182,16 +185,10 @@ public class DemoApplication {
         nonConsumer = true;
 
         /*
-         * Print StartupDiagnosticUtil banner only once on DevTools startup
-         * 
-         * DevTools calls main() twice on first launch — base JVM classloader then
-         * RestartClassLoader — causing the diagnostic banner to appear twice.
-         * Subsequent restarts (live-reload) correctly print it once.
-         * 
-         * Added AtomicBoolean guard: compareAndSet(false, true) allows only the
-         * first main() invocation to print; all subsequent calls are skipped.
-         */
-        if (DIAGNOSTIC_PRINTED.compareAndSet(false, true)) {
+         * Print StartupDiagnosticUtil banner only once on Application startup(JVM process) regardless of DevTools restart cycles.
+         * Survives across classloader reloads (JVM System properties persist) */
+        if (System.getProperty(DIAGNOSTIC_PRINTED_KEY) == null) {
+            System.setProperty(DIAGNOSTIC_PRINTED_KEY, "true");
             StartupDiagnosticUtil.print(args);
         }
         
