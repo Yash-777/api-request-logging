@@ -3,6 +3,8 @@ package com.github.yash777.apirequestlogging.properties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.NestedConfigurationProperty;
 
+import com.github.yash777.apirequestlogging.aop.HandlerFormat;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -349,12 +351,18 @@ public class ApiRequestLoggingProperties {
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * AOP settings for automatic controller handler capture.
+     * AOP settings for automatic controller-handler logging.
      *
-     * <h4>Sample output</h4>
+     * <p>The aspect emits a single log line per controller invocation, of the form:</p>
      * <pre>
-     *   controllerHandler: "UserController#listUsers"
+     *   [CONTROLLER-AOP] handler=[OrderController#createOrder] timeTaken=[12 ms]
      * </pre>
+     *
+     * <p>The verbosity of the {@code handler=[...]} field is controlled by a
+     * single {@link HandlerFormat} value rather than multiple booleans, since the
+     * realistic options form a clear progression (simple → qualified → full).
+     * The two remaining toggles ({@link #includeArgs}, {@link #includeReturnType})
+     * are orthogonal and append additional fields when enabled.</p>
      *
      * <h4>Required dependency (consumer pom.xml)</h4>
      * <pre>{@code
@@ -367,14 +375,69 @@ public class ApiRequestLoggingProperties {
      * ({@code @ConditionalOnClass(ProceedingJoinPoint.class)}).</p>
      */
     public static class AopProperties {
+        
         /**
-         * Enable AOP-based automatic capture of the controller handler name.
-         * Requires {@code spring-boot-starter-aop} on the classpath. Default: {@code true}.
+         * Master switch — enable AOP-based automatic capture of the controller
+         * handler. Requires {@code spring-boot-starter-aop} on the classpath.
+         * Default: {@code true}.
          */
         private boolean controllerHandlerEnabled = true;
-
-        public boolean isControllerHandlerEnabled() { return controllerHandlerEnabled; }
-        public void setControllerHandlerEnabled(boolean v) { this.controllerHandlerEnabled = v; }
+        
+        /**
+         * Verbosity of the {@code handler=[...]} field. See {@link HandlerFormat}
+         * for the four supported levels. Default: {@link HandlerFormat#SIMPLE}.
+         */
+        private HandlerFormat handlerFormat = HandlerFormat.SIMPLE;
+        
+        /**
+         * When {@code true}, appends an {@code args=[...]} field containing each
+         * runtime argument's {@code toString()} representation.
+         *
+         * <p><strong>Privacy warning:</strong> request bodies frequently contain
+         * PII (emails, addresses, payment data). Keep this {@code false} in
+         * production unless you have explicit field-level masking elsewhere.</p>
+         *
+         * <p>Default: {@code false}.</p>
+         */
+        private boolean includeArgs = false;
+        
+        /**
+         * When {@code true}, appends a {@code returnType=[...]} field with the
+         * declared return type of the controller method. The type is shown with
+         * or without its package depending on {@link #handlerFormat}
+         * ({@link HandlerFormat#FULL} or {@link HandlerFormat#QUALIFIED} use
+         * fully-qualified names).
+         *
+         * <p>Default: {@code false}.</p>
+         */
+        private boolean includeReturnType = false;
+        
+        /**
+         * If a controller method takes longer than this many milliseconds, the
+         * log line is emitted at {@code WARN} instead of {@code INFO}.
+         *
+         * <p>Set to {@code -1} (the default) to disable — every successful call
+         * is logged at {@code INFO} regardless of duration. Failed calls are
+         * always logged at {@code ERROR}.</p>
+         */
+        private long slowThresholdMs = -1L;
+        
+        // ── Getters / setters ──────────────────────────────────────────
+        
+        public boolean       isControllerHandlerEnabled()                { return controllerHandlerEnabled; }
+        public void          setControllerHandlerEnabled(boolean v)      { this.controllerHandlerEnabled = v; }
+        
+        public HandlerFormat getHandlerFormat()                          { return handlerFormat; }
+        public void          setHandlerFormat(HandlerFormat v)           { this.handlerFormat = (v == null ? HandlerFormat.SIMPLE : v); }
+        
+        public boolean       isIncludeArgs()                             { return includeArgs; }
+        public void          setIncludeArgs(boolean v)                   { this.includeArgs = v; }
+        
+        public boolean       isIncludeReturnType()                       { return includeReturnType; }
+        public void          setIncludeReturnType(boolean v)             { this.includeReturnType = v; }
+        
+        public long          getSlowThresholdMs()                        { return slowThresholdMs; }
+        public void          setSlowThresholdMs(long v)                  { this.slowThresholdMs = v; }
     }
 
     // ══════════════════════════════════════════════════════════════════
